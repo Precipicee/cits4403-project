@@ -225,7 +225,7 @@ reciprocity can sustain cooperation at all [7].
 
 ## 4. Model Overview
 
-One simulation run is **one city**, observed over `T` rounds.
+One simulation run is **one city**, observed over `T = 500` rounds, where one round is one week.
 
 ```
 initialise city (N agents, topology, strategy mix, wealth = 0)
@@ -241,6 +241,9 @@ for each round t in 1..T:
     9. metrics recorded
 ```
 
+Updating is synchronous: partner choice and moves in a round use the state at the start of that
+round, and the changes in steps 3 to 8 are applied after all of the round's games.
+
 Every stochastic step draws from a single seeded `numpy.random.Generator` passed through the
 model; there is no global RNG state and no unseeded call. A run is fully reproducible from
 `(seed, config)`.
@@ -249,8 +252,8 @@ model; there is no global RNG state and no unseeded call. A run is fully reprodu
 
 ### 5.1 The City Graph
 
-- `N` agents as nodes, with `N` in the low hundreds: large enough for network-scale effects,
-  small enough for a two-axis sweep with repeats.
+- `N = 200` agents as nodes: large enough for network-scale effects, small enough for a
+  two-axis sweep with repeats.
 - Initial topology from a configurable generator. **Erdős–Rényi** is the neutral default;
   **Watts–Strogatz** (small-world) and **Barabási–Albert** (scale-free) form the secondary
   experimental axis [14, Chs. 2-4]. Topology is expected to matter to H2 in
@@ -262,6 +265,8 @@ model; there is no global RNG state and no unseeded call. A run is fully reprodu
   giver/taker mix, and keeps it for the run.
 - Edge weights start at a small uniform `w0`, so no tie starts privileged. All agents start
   with zero wealth.
+- Each agent holds at most as many ties as it had in the initial graph (its **tie capacity**),
+  so each topology keeps its degree distribution as ties are lost and formed.
 
 ### 5.2 Wealth and the Resource Scale
 
@@ -271,9 +276,9 @@ model; there is no global RNG state and no unseeded call. A run is fully reprodu
 - **Wealth is created, not redistributed:** Each interaction adds `rho x payoff` to each
   participant, so total city wealth at round `T` is a direct readout of how the city's
   citizens have treated each other.
-- A conserved pool, from which interactions merely transfer wealth, is deliberately not used:
-  conservation forces `2R = T + S = 2P`, which destroys the Prisoner's Dilemma payoff ordering
-  and with it the phenomenon under study.
+- Wealth does not come from a conserved pool that interactions only transfer: conservation
+  forces `2R = T + S = 2P`, which destroys the Prisoner's Dilemma payoff ordering and with it
+  the phenomenon under study.
 - An optional **subsistence cost** `c` is deducted per agent per round, so that wealth can fall
   as well as rise. Default `c = 0`; enabled as a robustness check.
 
@@ -318,16 +323,17 @@ The model separates **interactions**, which are discrete contacts, from **ties**
 a relationship strength that decays over time, following the tie-decay formalism of
 [24].
 
-- **Reinforcement:** each interaction increments the tie's weight, `w <- w + delta`. Tie
+- **Reinforcement:** each interaction increments the tie's weight, `w <- w + delta`. An
+  interaction between two agents without a tie forms one when both have spare tie capacity. Tie
   strength accumulating with sustained interaction reflects the role of strong ties in
   sustaining cooperation [23].
 - **Decay:** weight decays with time since last contact, `w(t) = w x exp(-alpha x dt)`,
   applied lazily when the tie is evaluated. This models *neglect*, not punishment: an unused
   tie fades regardless of how its last interaction went.
 - **Severance:** a tie whose weight falls below the threshold `theta` is removed.
-- **Replacement:** the freed slot is refilled by drawing a new partner with the Section 5.3
-  rule, most often a friend of a friend, because the distance term makes nearby candidates
-  far more likely. Rewiring is therefore local and structure-preserving.
+- **Replacement:** the freed tie capacity is refilled by drawing a new partner with the
+  Section 5.3 rule, most often a friend of a friend, because the distance term makes nearby
+  candidates far more likely. Rewiring is therefore local and structure-preserving.
 
 Severance is **absolute** rather than **comparative**. A comparative rule, in which an agent
 swaps a tie for a better alternative, cannot operate here: a prospective tie has `w ~ 0` and
@@ -344,7 +350,14 @@ effect measured independently.
 
 `R_j` is a bounded, slowly updating rating of how much cooperative value `j` has recently
 returned to its partners: a composite of weighted degree and behaviour, normalised to
-`[R_min, R_max]` with `R_min > 0` so that no agent becomes unreachable.
+`[R_min, R_max]` with `R_min > 0` so that no agent becomes unreachable:
+
+```
+R_j = R_min + (R_max - R_min) x kappa_j x s_j
+```
+
+where `kappa_j` is an exponential moving average of the share of `j`'s moves that were
+cooperative, and `s_j` is `j`'s total tie strength divided by the largest in the city.
 
 It serves two roles in the hypotheses:
 
@@ -375,17 +388,19 @@ heterogeneity in how agents allocate attention.
 
 ### 6.1 Progressive Model Build
 
-The model is built in stages, each a named, runnable model with its own validation. Each
-stage must reduce to its predecessor under null parameters, which is the main correctness
-guarantee and allows any change in behaviour to be attributed to the mechanism just added.
+The model is built in stages, each a named, runnable model with its own validation. Every
+stage chooses partners with the same sampling rule (Section 5.3), so each stage reproduces its
+predecessor exactly, with the same seed, when its added mechanism is switched off. This is the
+main correctness guarantee and allows any change in behaviour to be attributed to the mechanism
+just added.
 
-| Stage | Adds | Validates against |
-|---|---|---|
-| **M0**: unstructured | Random pairing, no graph. | Known tournament behaviour: TFT competitive, AllD exploits AllC [16], [14, Ch. 12]. |
-| **M1**: static graph | Fixed topology, every edge played each round. | Network reciprocity: cooperation sustained at mixes where M0 collapses [12]. |
-| **M2**: weighted ties | Reinforcement, time decay, severance. | Tie weights reach a steady state; `alpha = 0` reduces to M1. |
-| **M3**: encounter | Distance-decayed, popularity-biased partner choice. | `lambda = beta = gamma = 0` reduces to uniform choice over neighbours. |
-| **M4**: rewiring | Severed-tie replacement. Full model. | Graph stays connected; turnover rate is bounded. |
+| Stage | Adds | Settings that reproduce the previous stage | Validates against |
+|---|---|---|---|
+| **M0**: unstructured | Complete graph: each agent meets `B` partners drawn uniformly from the whole city. Strategies also play 6-round round-robin matches. | n/a | Tournament payoffs of AllC 1.5, TFT 1.9 and AllD 3.33 points per round when one of each plays 6-round matches [14, Ch. 12]. |
+| **M1**: static graph | Fixed topology: partners drawn uniformly from neighbours. A variant plays every tie each round. | complete graph | Repeated local interaction protects givers, the fixed-strategy counterpart of network reciprocity [12]: the taker payoff advantage over givers is smaller than in M0 at every mix with both classes present. |
+| **M2**: weighted ties | Reinforcement, time decay, severance. | `alpha = 0`, `theta = 0` | Tie weights reach a steady state. |
+| **M3**: encounter | Distance-decayed, popularity-biased partner choice; received cap; ties formed on contact. | `d_max = 1`, `lambda = beta = gamma = 0`, no received cap | Received interactions never exceed `c_max`. |
+| **M4**: rewiring | Refilling of freed tie capacity. Full model. | `theta = 0` in both stages | The largest connected component holds at least 95% of agents and tie turnover is bounded; isolated agents are reported. |
 
 ### 6.2 Sweeps
 
@@ -395,7 +410,7 @@ guarantee and allows any change in behaviour to be attributed to the mechanism j
   network structure changes the H2 relationship.
 - **Tertiary axis (decay rate `alpha`):** three levels (low, default, high), not a full sweep;
   enough to show results are not an artefact of one decay setting.
-- **Repeats:** 20-30 seeds per cell. Every result is reported as a mean with a confidence
+- **Repeats:** 25 seeds per cell. Every result is reported as a mean with a confidence
   interval, never from a single run.
 - All other parameters (payoff values, `B`, `c_max`, `beta`, `gamma`, `lambda`, `theta`,
   `N`, `rho`) are held at documented defaults.
@@ -408,6 +423,13 @@ turnover is non-zero but not total. A sweep whose baseline is already pinned at 
 cannot reveal a threshold. Calibration runs and their outcomes are reported alongside the
 main results.
 
+### 6.4 Robustness
+
+Every modelling choice with a credible alternative (for example the popularity formula, the
+update order, the severance rule, the initial placement of givers and initial wealth) is a
+configurable setting with a fixed default. After the main sweep, each alternative is varied one
+at a time at giver fractions 0.2, 0.5 and 0.8, and any change in the H1-H4 verdicts is reported.
+
 ## 7. Measures
 
 ### 7.1 Quantitative
@@ -419,6 +441,13 @@ main results.
 
 **Distribution**
 - **Gini coefficient** of wealth over time (the primary H2 measure).
+- **Noise-floor Gini:** the Gini of matching cities in which every agent plays one strategy (all
+  TFT; all AllD), where inequality comes only from luck in encounter and network position.
+  Results are also reported as Gini excess over this floor.
+- **Rolling income Gini** over recent rounds, to confirm the distribution has reached a steady
+  state.
+- **Theil index** split into inequality between givers and takers and inequality within each
+  class, showing whether inequality follows behaviour or luck and position.
 - **Lorenz curves**, one per giver fraction, overlaid.
 - Wealth share of the top 10% and bottom 50%.
 - Mean wealth **by strategy**, to identify who captures the surplus.
@@ -427,6 +456,8 @@ main results.
 - Cooperation rate over time, overall and by strategy.
 - Fraction of interactions that are C/C, C/D and D/D (the direct link from behaviour to
   surplus).
+- **Taker payoff gap:** mean payoff per game of takers minus that of givers (the M1 validation
+  measure).
 
 **Structure (in-groups and out-groups)**
 - **Strategy assortativity** over time (the H3 measure).
@@ -434,6 +465,7 @@ main results.
   purity** of detected communities: are emergent clusters giver clusters?
 - Realised degree and mean tie weight, givers versus takers (the H3 quarantine measure).
 - Tie turnover rate, edge count, and the distribution of tie weights.
+- Largest connected component share and number of isolated agents (the M4 validation measure).
 
 ### 7.2 Qualitative
 
@@ -457,20 +489,23 @@ with wealth rising while Gini fails to fall.
 
 ## 8. Validation
 
-- **Reduction tests:** each stage collapses to its predecessor under null parameters
-  (Section 6.1). Automated.
-- **Baseline reproduction:** M0 reproduces known unstructured IPD behaviour
-  [14, Ch. 12] before any novel mechanism is switched on.
+- **Reduction checks:** each stage reproduces its predecessor under the settings in
+  Section 6.1, checked in that stage's notebook.
+- **Baseline reproduction:** before any novel mechanism is switched on, M0's round-robin
+  matches reproduce the tournament payoffs in [14, Ch. 12] exactly (3/2, 23/12 and 10/3 points
+  per round).
 - **Degenerate cases:** an all-AllC city should show near-maximal wealth and low Gini; an
-  all-AllD city near-minimal wealth and low Gini; identical agents on a regular graph should
-  show Gini near zero. A failure indicates an accounting error.
+  all-AllD city near-minimal wealth and low Gini; an all-TFT city on the complete graph in which
+  every tie is played each round should show a Gini of exactly zero. A failure indicates an
+  accounting error.
 - **Seed stability:** results are averaged over repeats and their spread shown. A conclusion
   that depends on a single seed is not reported as a conclusion.
 
 ## 9. Scope
 
-The model is implemented in Python 3 with `networkx`, `numpy` and `matplotlib`, and presented
-as Jupyter notebooks backed by importable model code.
+The model is implemented in Python 3 with `networkx`, `numpy`, `matplotlib` and `pandas`, and
+presented as Jupyter notebooks with `ipywidgets` explorers, backed by importable model code.
+Validation checks run in the notebooks.
 
 ### Core
 
@@ -478,8 +513,10 @@ as Jupyter notebooks backed by importable model code.
 - Positive-sum wealth accumulation scaled by resource density `rho`.
 - Distance-decayed, popularity-biased partner choice with a received-interaction cap.
 - Weighted ties with time decay, absolute severance and local replacement.
-- Progressive build M0-M4 with reduction tests.
-- Giver fraction x topology sweep, three decay levels, 20-30 seeds per cell.
+- Progressive build M0-M4 with reduction checks in the notebooks.
+- Giver fraction x topology sweep, three decay levels, 25 seeds per cell, with noise-floor
+  baselines.
+- Robustness runs varying one alternative setting at a time (Section 6.4).
 - Full prosperity, distribution, behaviour and structure metric suite, and the headline figure.
 
 ### Stretch targets

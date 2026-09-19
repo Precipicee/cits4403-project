@@ -47,6 +47,51 @@ def band(ax, x, mean, lo, hi, colour, label=None, linestyle="-", marker=None, di
                     va="center", fontsize=8, color=INK_2)
 
 
+def over_time(ax, means, metric, groups, colours, group_col="scenario", ylabel=None,
+              direct_label=False, linestyles=None):
+    """Mean over seeds against round, one banded line per group.
+
+    Consumes :func:`utilities.runs.series_means`, so the band is one standard error of the
+    mean either side: it shows where the scenarios are actually distinguishable, not the
+    spread of individual cities.
+    """
+    for g in groups:
+        rows = means[means[group_col] == g].sort_values("round")
+        m, se = rows[metric].to_numpy(float), rows[f"{metric}_se"].to_numpy(float)
+        band(ax, rows["round"], m, m - se, m + se, colours[g], label=g,
+             linestyle=(linestyles or {}).get(g, "-"), direct_label=direct_label)
+    ax.set_xlabel("week")
+    ax.set_ylabel(ylabel or metric.replace("_", " "))
+
+
+def delta_bars(ax, table, xlabel=None, label_col="step", value_col="mean", se_col="se"):
+    """Paired step-to-step changes as bars with standard-error whiskers.
+
+    Bars are coloured by sign rather than by entity: this figure is about direction, and each
+    row is a different comparison rather than a different thing.
+    """
+    y = np.arange(len(table))
+    values = table[value_col].to_numpy(float)
+    ax.barh(y, values, xerr=table[se_col].to_numpy(float), height=0.62,
+            color=[CLASS_COLOURS["giver"] if v >= 0 else CLASS_COLOURS["taker"] for v in values],
+            error_kw={"ecolor": INK_2, "elinewidth": 1, "capsize": 3})
+    ax.set_yticks(y, list(table[label_col]))
+    ax.invert_yaxis()
+    ax.axvline(0, color=AXIS, linewidth=1)
+    ax.set_xlabel(xlabel or value_col)
+    ax.grid(axis="y", visible=False)
+
+
+def lorenz_curves(ax, curves: dict, colours=None, ginis: dict | None = None):
+    """Lorenz curves keyed by label, against the line of equality."""
+    ax.plot([0, 1], [0, 1], color=AXIS, linewidth=1)
+    for (label, (p, l)), colour in zip(curves.items(), colours or SERIES):
+        text = f"{label} (Gini {ginis[label]:.2f})" if ginis else label
+        ax.plot(p, l, color=colour, linewidth=1.6, label=text)
+    ax.set(xlabel="share of citizens, poorest first", ylabel="share of wealth")
+    ax.set_aspect("equal")
+
+
 def cell_series(cells, metric, x_col, **filters):
     """Rows of an aggregated ``cells`` table for one metric, sorted by ``x_col``."""
     q = cells[cells["metric"] == metric]

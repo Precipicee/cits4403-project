@@ -117,9 +117,16 @@ class SampledEncounter:
 
 @ENCOUNTERS.register("all_edges")
 class AllEdgesEncounter:
+    """Every tie plays exactly once per round.
+
+    ``encounter.max_received`` deliberately does not apply here: this rule exists as the
+    exhaustive baseline, and capping it would silently drop games. It is the one encounter
+    rule where the attention constraint does not hold.
+    """
+
     def pairs(self, state, cfg, rng, agents=None):
         rows, cols = np.nonzero(np.triu(state.adjacency, 1))
         order = rng.permutation(len(rows))
         pairs = np.column_stack([rows[order], cols[order]]).astype(np.int64)
-        np.add.at(state.received, pairs[:, 1], 1)
+        np.add.at(state.received, pairs.ravel(), 1)   # both sides played
         return pairs, 0, 0

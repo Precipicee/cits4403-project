@@ -81,7 +81,7 @@ def summarise(result) -> tuple[dict, dict]:
         for k in STRUCTURE_METRICS:
             out[k] = float(structure[k][-1])
         rounds = structure["round"]
-        late = rounds >= min(TAIL, rounds.max())
+        late = rounds >= rounds.max() - TAIL
         if late.sum() >= 3:
             out["assortativity_slope"] = float(np.polyfit(rounds[late], structure["assortativity_class"][late], 1)[0]) \
                 if not np.isnan(structure["assortativity_class"][late]).any() else float("nan")

@@ -32,17 +32,19 @@ def payoff_table(payoff) -> np.ndarray:
     return np.array([[R, S], [T, P]], dtype=float)
 
 
-def empty_record() -> InteractionRecord:
+def empty_record(idle: int = 0, dropped: int = 0) -> InteractionRecord:
+    """A round in which nothing was played. The counters still travel: an agent that found no
+    partner, or whose requests were all dropped, produces no game but is not nothing."""
     e = np.zeros(0, dtype=np.int64)
     f = np.zeros(0)
     b = np.zeros(0, dtype=bool)
-    return InteractionRecord(e, e, e.astype(np.int8), e.astype(np.int8), f, f, b, b)
+    return InteractionRecord(e, e, e.astype(np.int8), e.astype(np.int8), f, f, b, b, idle, dropped)
 
 
 def play(state, pairs: np.ndarray, cfg, rng, idle: int = 0, dropped: int = 0) -> InteractionRecord:
     """Play one game per row of ``pairs`` using the memory in ``state`` (not updated here)."""
     if len(pairs) == 0:
-        return empty_record()
+        return empty_record(idle, dropped)
     i, j = pairs[:, 0], pairs[:, 1]
     actors = np.concatenate([i, j])
     partners = np.concatenate([j, i])

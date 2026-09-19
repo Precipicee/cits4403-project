@@ -32,11 +32,13 @@ class RunResult:
 
 
 def _concat(records: list[InteractionRecord]) -> InteractionRecord:
-    records = [r for r in records if r.n_games] or [empty_record()]
-    cat = lambda name: np.concatenate([getattr(r, name) for r in records])  # noqa: E731
+    # Counted over every record: an agent that found no partner contributes idle but no game.
+    idle, dropped = sum(r.idle for r in records), sum(r.dropped for r in records)
+    played = [r for r in records if r.n_games] or [empty_record()]
+    cat = lambda name: np.concatenate([getattr(r, name) for r in played])  # noqa: E731
     return InteractionRecord(cat("initiator"), cat("partner"), cat("move_i"), cat("move_j"),
                              cat("payoff_i"), cat("payoff_j"), cat("had_history"), cat("had_tie"),
-                             sum(r.idle for r in records), sum(r.dropped for r in records))
+                             idle, dropped)
 
 
 class Simulation:

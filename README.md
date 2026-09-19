@@ -43,11 +43,18 @@ is reproducible from its seed and configuration.
 
 ## Results
 
-`notebooks/Project.ipynb` runs the whole argument end to end in about two minutes: the model,
-what we expected, the sweep, the figures and the conclusions. In short: more givers make a city
-richer, and the gain accelerates once givers pass about 30% of the population, but the
-richest cities are not the most equal. Inequality peaks in mixed cities, and a city where nobody
-is ever exploited is no more equal than a mixed one, because the inequality is positional.
+`notebooks/Project.ipynb` runs the whole argument end to end in two to three minutes: the model,
+what we expected, the sweep, the figures, an extended analysis and the conclusions. In short: more
+givers make a city richer, and the gain accelerates once givers pass about 30% of the population,
+but the richest cities are not the most equal. Inequality peaks in mixed cities, and a city where
+nobody is ever exploited is no more equal than a mixed one, because the inequality is positional.
+
+The extended analysis takes that last point further. Holding everyone on Tit-for-Tat, so that no
+game can ever be exploited, total wealth is fixed by the rules and only its distribution varies:
+the Gini moves from 0.05 under uniform partner choice to 0.21 under the full rule, and the rank
+order of who gets met is settled within the first 25 of 500 weeks. It also decomposes the model
+ladder step by step, tracks clustering and connectivity over time, and finds no relationship
+between clustering and cooperation.
 
 ## Setup
 

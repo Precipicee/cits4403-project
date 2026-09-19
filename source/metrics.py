@@ -94,6 +94,62 @@ def largest_component_share(adjacency: np.ndarray) -> float:
     return float(np.bincount(components(adjacency)).max() / len(adjacency))
 
 
+def n_components(adjacency: np.ndarray) -> int:
+    return int(len(np.unique(components(adjacency))))
+
+
+def local_clustering(adjacency: np.ndarray) -> np.ndarray:
+    """Clustering coefficient per node: the share of an agent's pairs of neighbours who are
+    themselves tied. ``diag(A^3)`` counts each triangle through a node twice, which is exactly
+    the numerator. Nodes with fewer than two ties score 0, as in networkx."""
+    a = adjacency.astype(float)
+    closed = np.diag(a @ a @ a)
+    k = a.sum(axis=1)
+    pairs = k * (k - 1)
+    return np.divide(closed, pairs, out=np.zeros(len(a)), where=pairs > 0)
+
+
+def average_clustering(adjacency: np.ndarray) -> float:
+    return float(local_clustering(adjacency).mean())
+
+
+def transitivity(adjacency: np.ndarray) -> float:
+    """Global clustering: closed triples over all triples. Unlike ``average_clustering`` this
+    weights by degree, so it reports the city rather than the average citizen."""
+    a = adjacency.astype(float)
+    k = a.sum(axis=1)
+    triples = (k * (k - 1)).sum()
+    # A city with no triples at all has no closed ones either: 0, not undefined.
+    return float(np.trace(a @ a @ a) / triples) if triples > 0 else 0.0
+
+
+def path_lengths(adjacency: np.ndarray) -> np.ndarray:
+    """All-pairs shortest path lengths by frontier expansion; unreachable pairs are ``inf``."""
+    n = len(adjacency)
+    dist = np.full((n, n), np.inf)
+    np.fill_diagonal(dist, 0)
+    reached = np.eye(n, dtype=bool)
+    frontier = np.eye(n)
+    a = adjacency.astype(float)
+    for d in range(1, n):
+        new = ((frontier @ a) > 0) & ~reached
+        if not new.any():
+            break
+        dist[new] = d
+        reached |= new
+        frontier = new.astype(float)
+    return dist
+
+
+def mean_path_length(adjacency: np.ndarray) -> float:
+    """Mean shortest path over pairs that can reach each other, ignoring a split city's
+    unreachable pairs rather than reporting infinity for the whole graph."""
+    d = path_lengths(adjacency)
+    off = ~np.eye(len(d), dtype=bool)
+    finite = np.isfinite(d) & off
+    return float(d[finite].mean()) if finite.any() else float("nan")
+
+
 def bootstrap_ci(values, n_boot: int = 2000, level: float = 0.95, rng=None, axis: int = 0):
     """Percentile bootstrap interval for the mean along ``axis`` (resampling that axis)."""
     values = np.asarray(values, dtype=float)

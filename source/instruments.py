@@ -20,6 +20,8 @@ STRUCTURE_METRICS = (
     "assortativity_class", "assortativity_strategy", "modularity", "purity", "n_communities",
     "degree_giver", "degree_taker", "weight_giver", "weight_taker",
     "realised_degree_giver", "realised_degree_taker", "isolated_giver", "isolated_taker",
+    "clustering", "clustering_giver", "clustering_taker", "transitivity",
+    "mean_path_length", "n_components", "largest_component_share",
 )
 # Rates are summarised by their mean over the last 100 rounds; stocks by their final value.
 FLOW_METRICS = {"mean_income", "income_gini", "coop_rate", "coop_rate_giver", "coop_rate_taker",
@@ -96,6 +98,7 @@ class Structure:
         mean_w = np.divide((w * st.adjacency).sum(axis=1), deg, out=np.full(st.n, np.nan), where=deg > 0)
         realised = (st.last_game >= st.t - cfg.metrics.income_window + 1).sum(axis=1)
         iso = deg == 0
+        local_c = M.local_clustering(st.adjacency)
         self.rounds.append(st.t)
         self.rows.append({
             "assortativity_class": M.assortativity(g, "giver"),
@@ -107,6 +110,13 @@ class Structure:
             "realised_degree_giver": _class_mean(realised, st.giver),
             "realised_degree_taker": _class_mean(realised, ~st.giver),
             "isolated_giver": int((iso & st.giver).sum()), "isolated_taker": int((iso & ~st.giver).sum()),
+            "clustering": float(local_c.mean()),
+            "clustering_giver": _class_mean(local_c, st.giver),
+            "clustering_taker": _class_mean(local_c, ~st.giver),
+            "transitivity": M.transitivity(st.adjacency),
+            "mean_path_length": M.mean_path_length(st.adjacency),
+            "n_components": M.n_components(st.adjacency),
+            "largest_component_share": M.largest_component_share(st.adjacency),
         })
 
     def update(self, st, info, rng):

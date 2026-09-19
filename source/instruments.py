@@ -1,0 +1,167 @@
+"""Instruments record metrics as a simulation runs."""
+from __future__ import annotations
+
+import numpy as np
+
+from . import metrics as M
+from .registry import Registry
+from .strategies import STRATEGY_KEYS
+
+INSTRUMENTS = Registry("instrument")
+
+CORE_METRICS = (
+    "mean_wealth", "median_wealth", "total_wealth", "mean_income", "gini", "top10_share",
+    "bottom50_share", "income_gini", "theil", "theil_within", "theil_between",
+    "coop_rate", "coop_rate_giver", "coop_rate_taker", "cc_share", "cd_share", "dd_share",
+    "payoff_gap", "repeat_share", "stranger_share", "n_ties", "mean_weight", "turnover",
+    "largest_component", "isolated", "idle", "dropped", "max_received", "mean_rating",
+)
+STRUCTURE_METRICS = (
+    "assortativity_class", "assortativity_strategy", "modularity", "purity", "n_communities",
+    "degree_giver", "degree_taker", "weight_giver", "weight_taker",
+    "realised_degree_giver", "realised_degree_taker", "isolated_giver", "isolated_taker",
+)
+# Rates are summarised by their mean over the last 100 rounds; stocks by their final value.
+FLOW_METRICS = {"mean_income", "income_gini", "coop_rate", "coop_rate_giver", "coop_rate_taker",
+                "cc_share", "cd_share", "dd_share", "repeat_share", "stranger_share", "turnover",
+                "idle", "dropped", "max_received"}
+
+
+def _class_mean(values, mask):
+    return float(values[mask].mean()) if mask.any() else float("nan")
+
+
+@INSTRUMENTS.register("core")
+class Core:
+    name = "core"
+
+    def start(self, state, cfg, rng):
+        self.cfg = cfg
+        self.data = {k: np.full(cfg.run.n_rounds, np.nan) for k in CORE_METRICS}
+
+    def update(self, st, info, rng):
+        d, r, t, cfg = self.data, info.record, st.t - 1, self.cfg
+        w = st.wealth
+        d["mean_wealth"][t], d["median_wealth"][t], d["total_wealth"][t] = w.mean(), np.median(w), w.sum()
+        d["mean_income"][t] = st.income.mean()
+        d["gini"][t], d["top10_share"][t], d["bottom50_share"][t] = M.gini(w), M.top_share(w), M.bottom_share(w)
+        d["income_gini"][t] = M.gini(st.income_buffer[: min(st.t, len(st.income_buffer))].sum(axis=0))
+        d["theil"][t], d["theil_within"][t], d["theil_between"][t] = M.theil_decomposition(w, st.giver)
+        n_games = r.n_games
+        if n_games:
+            moves_giver = np.concatenate([st.giver[r.initiator], st.giver[r.partner]])
+            moves = np.concatenate([r.move_i, r.move_j]) == 0
+            d["coop_rate"][t] = moves.mean()
+            d["coop_rate_giver"][t] = moves[moves_giver].mean() if moves_giver.any() else np.nan
+            d["coop_rate_taker"][t] = moves[~moves_giver].mean() if (~moves_giver).any() else np.nan
+            both = (r.move_i == 0) & (r.move_j == 0)
+            neither = (r.move_i == 1) & (r.move_j == 1)
+            d["cc_share"][t], d["dd_share"][t] = both.mean(), neither.mean()
+            d["cd_share"][t] = 1 - both.mean() - neither.mean()
+            d["repeat_share"][t] = r.had_history.mean()
+            d["stranger_share"][t] = 1 - r.had_tie.mean()
+        per_game = np.divide(st.payoff_total, st.games_played, out=np.full(st.n, np.nan), where=st.games_played > 0)
+        d["payoff_gap"][t] = _class_mean(per_game, ~st.giver & (st.games_played > 0)) - _class_mean(per_game, st.giver & (st.games_played > 0))
+        n_ties = st.adjacency.sum() / 2
+        d["n_ties"][t] = n_ties
+        d["mean_weight"][t] = st.effective_weight(cfg.ties.decay_rate)[st.adjacency].mean() if n_ties else np.nan
+        d["turnover"][t] = (info.removed + info.formed + info.refilled) / n_ties if n_ties else np.nan
+        labels = M.components(st.adjacency)
+        d["largest_component"][t] = np.bincount(labels).max() / st.n
+        d["isolated"][t] = (st.adjacency.sum(axis=1) == 0).sum()
+        d["idle"][t], d["dropped"][t] = r.idle, r.dropped
+        d["max_received"][t] = st.received.max()
+        d["mean_rating"][t] = st.rating.mean()
+
+    def result(self):
+        return self.data
+
+
+@INSTRUMENTS.register("structure")
+class Structure:
+    name = "structure"
+
+    def start(self, state, cfg, rng):
+        self.cfg = cfg
+        self.rounds, self.rows = [], []
+        self._record(state, rng)
+
+    def _record(self, st, rng):
+        cfg = self.cfg
+        g = st.to_networkx(cfg.ties.decay_rate)
+        seed = int(rng.integers(2**32))
+        q, purity, n_comm = M.modularity_and_purity(g, st.giver, cfg.metrics.community_method, seed)
+        deg = st.adjacency.sum(axis=1)
+        w = st.effective_weight(cfg.ties.decay_rate)
+        mean_w = np.divide((w * st.adjacency).sum(axis=1), deg, out=np.full(st.n, np.nan), where=deg > 0)
+        realised = (st.last_game >= st.t - cfg.metrics.income_window + 1).sum(axis=1)
+        iso = deg == 0
+        self.rounds.append(st.t)
+        self.rows.append({
+            "assortativity_class": M.assortativity(g, "giver"),
+            "assortativity_strategy": M.assortativity(g, "strategy"),
+            "modularity": q, "purity": purity, "n_communities": n_comm,
+            "degree_giver": _class_mean(deg, st.giver), "degree_taker": _class_mean(deg, ~st.giver),
+            "weight_giver": float(np.nanmean(mean_w[st.giver])) if (st.giver & ~iso).any() else np.nan,
+            "weight_taker": float(np.nanmean(mean_w[~st.giver])) if (~st.giver & ~iso).any() else np.nan,
+            "realised_degree_giver": _class_mean(realised, st.giver),
+            "realised_degree_taker": _class_mean(realised, ~st.giver),
+            "isolated_giver": int((iso & st.giver).sum()), "isolated_taker": int((iso & ~st.giver).sum()),
+        })
+
+    def update(self, st, info, rng):
+        if st.t % self.cfg.metrics.structure_every == 0 or st.t == self.cfg.run.n_rounds:
+            self._record(st, rng)
+
+    def result(self):
+        out = {"round": np.array(self.rounds)}
+        for k in STRUCTURE_METRICS:
+            out[k] = np.array([row[k] for row in self.rows], dtype=float)
+        return out
+
+
+def _snapshot(st, cfg):
+    p, l = M.lorenz(st.wealth)
+    return {"round": st.t, "strategy": st.strategy.copy(), "giver": st.giver.copy(),
+            "wealth": st.wealth.copy(), "adjacency": st.adjacency.copy(),
+            "weight": st.effective_weight(cfg.ties.decay_rate).copy(), "rating": st.rating.copy(),
+            "coop_ema": st.coop_ema.copy(), "games_played": st.games_played.copy(),
+            "coop_moves": st.coop_moves.copy(), "lorenz_p": p, "lorenz_l": l}
+
+
+@INSTRUMENTS.register("snapshot")
+class Snapshot:
+    name = "snapshot"
+
+    def start(self, state, cfg, rng):
+        self.cfg, self.data = cfg, None
+
+    def update(self, st, info, rng):
+        if st.t == self.cfg.run.n_rounds:
+            self.data = _snapshot(st, self.cfg)
+
+    def result(self):
+        return self.data
+
+
+@INSTRUMENTS.register("snapshots")
+class Snapshots:
+    name = "snapshots"
+    every = 50
+
+    def start(self, state, cfg, rng):
+        self.cfg, self.data = cfg, [_snapshot(state, cfg)]
+
+    def update(self, st, info, rng):
+        if st.t % self.every == 0 or st.t == self.cfg.run.n_rounds:
+            self.data.append(_snapshot(st, self.cfg))
+
+    def result(self):
+        return self.data
+
+
+def make_instruments(names, cfg):
+    return [INSTRUMENTS.create(n) for n in names]
+
+
+__all__ = ["CORE_METRICS", "STRUCTURE_METRICS", "FLOW_METRICS", "STRATEGY_KEYS", "make_instruments"]

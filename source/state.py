@@ -1,6 +1,7 @@
 """City state held as numpy arrays, and construction of the initial city."""
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 
 import networkx as nx
@@ -100,6 +101,52 @@ class CityState:
         return g
 
 
+def _spanning_edges(adjacency: np.ndarray) -> np.ndarray:
+    """Edges of a breadth-first spanning forest: the ties that hold the city together."""
+    n = len(adjacency)
+    seen = np.zeros(n, dtype=bool)
+    keep = np.zeros_like(adjacency)
+    for root in range(n):
+        if seen[root]:
+            continue
+        seen[root] = True
+        queue = deque([root])
+        while queue:
+            v = queue.popleft()
+            for u in np.flatnonzero(adjacency[v] & ~seen):
+                seen[u] = True
+                keep[v, u] = keep[u, v] = True
+                queue.append(u)
+    return keep
+
+
+def _trim_to_capacity(adjacency: np.ndarray, capacity: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Drop ties from agents that start over capacity, so ``degree <= capacity`` holds from
+    round 0. Spanning-forest edges are never cut, so a city generated connected stays connected;
+    an agent whose excess cannot be removed without splitting the city keeps its ties and has its
+    capacity raised to match. Deterministic: it draws no random numbers, and does nothing at all
+    when capacity is the initial degree.
+    """
+    if (adjacency.sum(axis=1) <= capacity).all():
+        return adjacency, capacity
+    protected = _spanning_edges(adjacency)
+    adjacency, capacity = adjacency.copy(), capacity.copy()
+    while True:
+        degree = adjacency.sum(axis=1)
+        excess = degree - capacity
+        over = np.flatnonzero(excess > 0)
+        if not len(over):
+            return adjacency, capacity
+        i = int(over[np.argmax(excess[over])])
+        cand = np.flatnonzero(adjacency[i] & ~protected[i])
+        if not len(cand):
+            capacity[i] = degree[i]
+            continue
+        # Prefer a partner who is also over capacity, then the better connected of them.
+        j = int(cand[np.lexsort((degree[cand], excess[cand]))[-1]])
+        adjacency[i, j] = adjacency[j, i] = False
+
+
 def build_city(cfg, streams: Streams) -> CityState:
     from .encounter import distance_matrix
     from .popularity import POPULARITY
@@ -123,6 +170,7 @@ def build_city(cfg, streams: Streams) -> CityState:
         broad = streams.population.random(n) < cfg.population.style_mix
         style = np.where(broad, 1, 2).astype(np.int8)
         capacity = np.where(broad, cfg.population.k_broad, cfg.population.k_narrow).astype(np.int16)
+    adjacency, capacity = _trim_to_capacity(adjacency, capacity)
 
     def minus_one():
         return np.full((n, n), -1, dtype=np.int8)

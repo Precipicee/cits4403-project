@@ -24,9 +24,8 @@ def write_run(path: Path, result, versions: dict) -> None:
     if "structure" in result.outputs:
         pd.DataFrame(result.outputs["structure"]).to_csv(path / "structure.csv.gz", index=False, float_format="%.6g")
     if result.outputs.get("snapshot") is not None:
-        snap = dict(result.outputs["snapshot"])
-        snap["adjacency"] = np.packbits(snap["adjacency"])
-        np.savez_compressed(path / "snapshot.npz", **snap)
+        # Stored unpacked, so it matches the shape the plural "snapshots" instrument writes.
+        np.savez_compressed(path / "snapshot.npz", **result.outputs["snapshot"])
     if result.outputs.get("snapshots"):
         frames = result.outputs["snapshots"]
         stacked = {k: np.stack([f[k] for f in frames]) for k in frames[0]}

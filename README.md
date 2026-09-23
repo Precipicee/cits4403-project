@@ -53,8 +53,10 @@ The extended analysis takes that last point further. Holding everyone on Tit-for
 game can ever be exploited, total wealth is fixed by the rules and only its distribution varies:
 the Gini moves from 0.05 under uniform partner choice to 0.21 under the full rule, and the rank
 order of who gets met is settled within the first 25 of 500 weeks. It also decomposes the model
-ladder step by step, tracks clustering and connectivity over time, and finds no relationship
-between clustering and cooperation.
+ladder step by step and tracks clustering and connectivity over time. Rewiring a city from a
+lattice to a random graph, which collapses clustering elevenfold while holding the population and
+the mean degree fixed, moves the cooperation rate by -0.004 (se 0.005): within this model, how
+ties are arranged is not what makes a city cooperative.
 
 ## Setup
 

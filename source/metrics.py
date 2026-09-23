@@ -98,15 +98,38 @@ def n_components(adjacency: np.ndarray) -> int:
     return int(len(np.unique(components(adjacency))))
 
 
+def clustering_terms(adjacency: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Per node: closed triples running through it, and pairs of neighbours it holds.
+
+    ``diag(A^3)`` counts each triangle through a node twice, which is exactly the numerator of
+    the clustering coefficient, and ``k(k-1)`` is its denominator. Only the diagonal is wanted,
+    and ``((A @ A) * A).sum(axis=1)`` gives it in one matrix multiply instead of the two that
+    forming ``A^3`` would need. Both coefficients below are ratios of these same two terms, so
+    a caller that wants both should take them from a single call.
+    """
+    a = adjacency.astype(float)
+    closed = ((a @ a) * a).sum(axis=1)
+    k = a.sum(axis=1)
+    return closed, k * (k - 1)
+
+
+def clustering(adjacency: np.ndarray) -> tuple[np.ndarray, float]:
+    """Per-node clustering and the city's transitivity together, from one pass over the triangles.
+
+    The structure instrument records both every few rounds, and measuring them separately would
+    repeat the cubic multiply for no gain.
+    """
+    closed, pairs = clustering_terms(adjacency)
+    local = np.divide(closed, pairs, out=np.zeros(len(pairs)), where=pairs > 0)
+    triples = pairs.sum()
+    # A city with no triples at all has no closed ones either: 0, not undefined.
+    return local, float(closed.sum() / triples) if triples > 0 else 0.0
+
+
 def local_clustering(adjacency: np.ndarray) -> np.ndarray:
     """Clustering coefficient per node: the share of an agent's pairs of neighbours who are
-    themselves tied. ``diag(A^3)`` counts each triangle through a node twice, which is exactly
-    the numerator. Nodes with fewer than two ties score 0, as in networkx."""
-    a = adjacency.astype(float)
-    closed = np.diag(a @ a @ a)
-    k = a.sum(axis=1)
-    pairs = k * (k - 1)
-    return np.divide(closed, pairs, out=np.zeros(len(a)), where=pairs > 0)
+    themselves tied. Nodes with fewer than two ties score 0, as in networkx."""
+    return clustering(adjacency)[0]
 
 
 def average_clustering(adjacency: np.ndarray) -> float:
@@ -116,11 +139,7 @@ def average_clustering(adjacency: np.ndarray) -> float:
 def transitivity(adjacency: np.ndarray) -> float:
     """Global clustering: closed triples over all triples. Unlike ``average_clustering`` this
     weights by degree, so it reports the city rather than the average citizen."""
-    a = adjacency.astype(float)
-    k = a.sum(axis=1)
-    triples = (k * (k - 1)).sum()
-    # A city with no triples at all has no closed ones either: 0, not undefined.
-    return float(np.trace(a @ a @ a) / triples) if triples > 0 else 0.0
+    return clustering(adjacency)[1]
 
 
 def path_lengths(adjacency: np.ndarray) -> np.ndarray:

@@ -43,7 +43,7 @@ is reproducible from its seed and configuration.
 
 ## Results
 
-`notebooks/Project.ipynb` runs the whole argument end to end in two to three minutes: the model,
+`notebooks/Project.ipynb` runs the whole argument end to end in about ten minutes: the model,
 what we expected, the sweep, the figures, an extended analysis and the conclusions. In short: more
 givers make a city richer, and the gain accelerates once givers pass about 30% of the population,
 but the richest cities are not the most equal. Inequality peaks in mixed cities, and a city where
@@ -55,8 +55,9 @@ the Gini moves from 0.05 under uniform partner choice to 0.21 under the full rul
 order of who gets met is settled within the first 25 of 500 weeks. It also decomposes the model
 ladder step by step and tracks clustering and connectivity over time. Rewiring a city from a
 lattice to a random graph, which collapses clustering elevenfold while holding the population and
-the mean degree fixed, moves the cooperation rate by -0.004 (se 0.005): within this model, how
-ties are arranged is not what makes a city cooperative.
+the mean degree fixed, moves the cooperation rate by -0.0055 (se 0.0025): real, but some twenty
+times less than partner choice moves it in a single step. Within this model, how ties are
+arranged is a rounding error next to who gets chosen.
 
 ## Setup
 

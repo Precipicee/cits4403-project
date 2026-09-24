@@ -94,6 +94,81 @@ def largest_component_share(adjacency: np.ndarray) -> float:
     return float(np.bincount(components(adjacency)).max() / len(adjacency))
 
 
+def n_components(adjacency: np.ndarray) -> int:
+    return int(len(np.unique(components(adjacency))))
+
+
+def clustering_terms(adjacency: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Per node: closed triples running through it, and pairs of neighbours it holds.
+
+    ``diag(A^3)`` counts each triangle through a node twice, which is exactly the numerator of
+    the clustering coefficient, and ``k(k-1)`` is its denominator. Only the diagonal is wanted,
+    and ``((A @ A) * A).sum(axis=1)`` gives it in one matrix multiply instead of the two that
+    forming ``A^3`` would need. Both coefficients below are ratios of these same two terms, so
+    a caller that wants both should take them from a single call.
+    """
+    a = adjacency.astype(float)
+    closed = ((a @ a) * a).sum(axis=1)
+    k = a.sum(axis=1)
+    return closed, k * (k - 1)
+
+
+def clustering(adjacency: np.ndarray) -> tuple[np.ndarray, float]:
+    """Per-node clustering and the city's transitivity together, from one pass over the triangles.
+
+    The structure instrument records both every few rounds, and measuring them separately would
+    repeat the cubic multiply for no gain.
+    """
+    closed, pairs = clustering_terms(adjacency)
+    local = np.divide(closed, pairs, out=np.zeros(len(pairs)), where=pairs > 0)
+    triples = pairs.sum()
+    # A city with no triples at all has no closed ones either: 0, not undefined.
+    return local, float(closed.sum() / triples) if triples > 0 else 0.0
+
+
+def local_clustering(adjacency: np.ndarray) -> np.ndarray:
+    """Clustering coefficient per node: the share of an agent's pairs of neighbours who are
+    themselves tied. Nodes with fewer than two ties score 0, as in networkx."""
+    return clustering(adjacency)[0]
+
+
+def average_clustering(adjacency: np.ndarray) -> float:
+    return float(local_clustering(adjacency).mean())
+
+
+def transitivity(adjacency: np.ndarray) -> float:
+    """Global clustering: closed triples over all triples. Unlike ``average_clustering`` this
+    weights by degree, so it reports the city rather than the average citizen."""
+    return clustering(adjacency)[1]
+
+
+def path_lengths(adjacency: np.ndarray) -> np.ndarray:
+    """All-pairs shortest path lengths by frontier expansion; unreachable pairs are ``inf``."""
+    n = len(adjacency)
+    dist = np.full((n, n), np.inf)
+    np.fill_diagonal(dist, 0)
+    reached = np.eye(n, dtype=bool)
+    frontier = np.eye(n)
+    a = adjacency.astype(float)
+    for d in range(1, n):
+        new = ((frontier @ a) > 0) & ~reached
+        if not new.any():
+            break
+        dist[new] = d
+        reached |= new
+        frontier = new.astype(float)
+    return dist
+
+
+def mean_path_length(adjacency: np.ndarray) -> float:
+    """Mean shortest path over pairs that can reach each other, ignoring a split city's
+    unreachable pairs rather than reporting infinity for the whole graph."""
+    d = path_lengths(adjacency)
+    off = ~np.eye(len(d), dtype=bool)
+    finite = np.isfinite(d) & off
+    return float(d[finite].mean()) if finite.any() else float("nan")
+
+
 def bootstrap_ci(values, n_boot: int = 2000, level: float = 0.95, rng=None, axis: int = 0):
     """Percentile bootstrap interval for the mean along ``axis`` (resampling that axis)."""
     values = np.asarray(values, dtype=float)

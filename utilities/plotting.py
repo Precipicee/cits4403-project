@@ -11,9 +11,10 @@ INK, INK_2, MUTED, GRID, AXIS = "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#c3
 # Colour follows the entity everywhere: one colour per class, strategy and topology.
 CLASS_COLOURS = {"giver": "#2a78d6", "taker": "#eb6834"}
 STRATEGY_COLOURS = {"allc": "#2a78d6", "alld": "#eb6834", "tft": "#1baf7a", "gtft": "#eda100",
-                    "tf2t": "#e87ba4", "grudger": "#008300", "pavlov": "#4a3aa7", "random": "#e34948"}
+                    "tf2t": "#e87ba4", "grudger": "#008300", "pavlov": "#4a3aa7", "random": "#e34948",
+                    "joss": "#8a4b1c"}
 STRATEGY_LABELS = {"allc": "AllC", "alld": "AllD", "tft": "TFT", "gtft": "GTFT", "tf2t": "TF2T",
-                   "grudger": "Grudger", "pavlov": "Pavlov", "random": "Random"}
+                   "grudger": "Grudger", "pavlov": "Pavlov", "random": "Random", "joss": "Joss"}
 TOPOLOGY_COLOURS = {"erdos_renyi": "#4a3aa7", "watts_strogatz": "#008300", "barabasi_albert": "#e34948"}
 TOPOLOGY_STYLES = {"erdos_renyi": "-", "watts_strogatz": "--", "barabasi_albert": ":"}
 TOPOLOGY_MARKERS = {"erdos_renyi": "o", "watts_strogatz": "s", "barabasi_albert": "^"}

@@ -8,7 +8,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 GIVER_STRATEGIES = ("allc", "tft", "gtft", "tf2t", "grudger", "pavlov")
-TAKER_STRATEGIES = ("alld", "random")
+TAKER_STRATEGIES = ("alld", "random", "joss")
+# Joss is available to every city but not drawn by default: the default taker class is the two
+# unconditional defectors, and Joss is mixed in only where a scenario asks for it.
+DEFAULT_TAKERS = ("alld", "random")
 
 
 class ConfigError(ValueError):
@@ -20,7 +23,7 @@ class PopulationConfig:
     n_agents: int = 200
     giver_fraction: float = 0.5
     giver_composition: dict = field(default_factory=lambda: {k: 1.0 for k in GIVER_STRATEGIES})
-    taker_composition: dict = field(default_factory=lambda: {k: 1.0 for k in TAKER_STRATEGIES})
+    taker_composition: dict = field(default_factory=lambda: {k: 1.0 for k in DEFAULT_TAKERS})
     placement: str = "random"
     initial_wealth: str = "zero"
     endowment_mean: float = 10.0
@@ -51,6 +54,9 @@ class GameConfig:
 class StrategyParams:
     gtft_forgiveness: float = 0.1
     random_cooperation: float = 0.5
+    # Axelrod's Joss: Tit-for-Tat that slips in an unprovoked defection one game in ten, so it
+    # cooperates ~90% of the time and holds a rating close to a giver's while still exploiting.
+    joss_defection: float = 0.1
     classes: dict = field(default_factory=lambda: {**{k: "giver" for k in GIVER_STRATEGIES},
                                                    **{k: "taker" for k in TAKER_STRATEGIES}})
 
@@ -206,6 +212,8 @@ class ModelConfig:
             e.append(f"unknown topology.name: {t.name}")
         if t.name in ("watts_strogatz", "barabasi_albert") and t.mean_degree % 2:
             e.append("topology.mean_degree must be even for watts_strogatz and barabasi_albert")
+        if not 0.0 <= s.joss_defection <= 1.0:
+            e.append("strategies.joss_defection must lie in [0, 1]")
         if g.rho <= 0 or not 0.0 <= g.noise <= 1.0 or g.subsistence_cost < 0:
             e.append("game.rho > 0, game.noise in [0, 1], game.subsistence_cost >= 0 required")
         if enc.rule not in ("sampled", "all_edges"):

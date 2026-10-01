@@ -75,6 +75,13 @@ class EncounterConfig:
     weight_exponent: float = 1.0
     popularity_exponent: float = 1.0
     eps: float = 0.1
+    # Who an agent will not play. "experience": a pair stops meeting once either side has
+    # defected on the other at their last game (walking away instead of retaliating).
+    # "reputation": nobody plays a partner rated below refusal_threshold. "none": every
+    # meeting is accepted.
+    refusal: str = "none"
+    refusal_memory: int | None = None
+    refusal_threshold: float = 0.25
 
 
 @dataclass(frozen=True)
@@ -226,6 +233,10 @@ class ModelConfig:
             e.append("encounter.on_saturated must be redraw or drop")
         if enc.kernel not in ("power", "rank"):
             e.append("encounter.kernel must be power or rank")
+        if enc.refusal not in ("none", "experience", "reputation"):
+            e.append("encounter.refusal must be none, experience or reputation")
+        if enc.refusal_memory is not None and enc.refusal_memory < 1:
+            e.append("encounter.refusal_memory must be None or at least 1")
         if enc.eps <= 0:
             e.append("encounter.eps must be positive")
         if ti.decay_rate < 0 or ti.severance_threshold < 0 or ti.initial_weight <= 0 or ti.reinforcement <= 0:

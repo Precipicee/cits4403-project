@@ -46,6 +46,26 @@ class RankKernel:
         return k
 
 
+def refused(state, cfg) -> np.ndarray | None:
+    """Pairs that will not play this round, as a symmetric boolean matrix; None when every
+    meeting is accepted.
+
+    Under "experience" a pair is closed once either side defected on the other at their last
+    game: the victim walks away, and the defector cannot get back in. Nothing here looks at
+    class or strategy, so any exclusion of takers comes from what they did, partner by partner.
+    """
+    enc = cfg.encounter
+    if enc.refusal == "none":
+        return None
+    if enc.refusal == "experience":
+        closed = (state.last_move == 1) | (state.last_move.T == 1)
+        if enc.refusal_memory is not None:
+            closed &= (state.t - state.last_game) <= enc.refusal_memory
+        return closed
+    low = state.rating < enc.refusal_threshold
+    return low[:, None] | low[None, :]
+
+
 def scores(state, cfg, rows=None) -> np.ndarray:
     """Attractiveness ``(w_eff + eps)^beta x R^gamma x K(d)`` for candidate partners (0 elsewhere)."""
     enc = cfg.encounter
@@ -57,6 +77,9 @@ def scores(state, cfg, rows=None) -> np.ndarray:
         s *= (w + enc.eps) ** enc.weight_exponent
     if enc.popularity_exponent != 0:
         s *= state.rating[None, :] ** enc.popularity_exponent
+    closed = refused(state, cfg)
+    if closed is not None:
+        s *= ~(closed if rows is None else closed[rows])
     return s
 
 

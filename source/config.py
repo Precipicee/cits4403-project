@@ -124,6 +124,7 @@ class UpdateConfig:
 class MetricsConfig:
     income_window: int = 25
     structure_every: int = 10
+    snapshot_every: int = 50
     community_method: str = "louvain"
     assortativity_attribute: str = "class"
     inequality: str = "gini"
@@ -253,8 +254,9 @@ class ModelConfig:
             e.append("popularity: 0 < r_min <= r_max, 0 < smoothing <= 1, 0 <= mix <= 1 required")
         if self.update.order not in ("synchronous", "asynchronous"):
             e.append("update.order must be synchronous or asynchronous")
-        if self.run.n_rounds < 1 or self.metrics.income_window < 1 or self.metrics.structure_every < 1:
-            e.append("run.n_rounds, metrics.income_window and metrics.structure_every must be at least 1")
+        if self.run.n_rounds < 1 or self.metrics.income_window < 1 or self.metrics.structure_every < 1 \
+                or self.metrics.snapshot_every < 1:
+            e.append("run.n_rounds and the metrics.*_window/*_every settings must be at least 1")
         if e:
             raise ConfigError("; ".join(e))
         return self

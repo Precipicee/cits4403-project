@@ -171,13 +171,12 @@ class Snapshot:
 @INSTRUMENTS.register("snapshots")
 class Snapshots:
     name = "snapshots"
-    every = 50
 
     def start(self, state, cfg, rng):
         self.cfg, self.data = cfg, [_snapshot(state, cfg)]
 
     def update(self, st, info, rng):
-        if st.t % self.every == 0 or st.t == self.cfg.run.n_rounds:
+        if st.t % self.cfg.metrics.snapshot_every == 0 or st.t == self.cfg.run.n_rounds:
             self.data.append(_snapshot(st, self.cfg))
 
     def result(self):

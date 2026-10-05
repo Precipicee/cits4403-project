@@ -24,6 +24,15 @@ STAGE_STYLES = {"M0": "--", "M1": "-", "M1-edges": ":"}
 SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
 
 
+def save(fig, name: str, folder=None) -> None:
+    """Write ``fig`` as PDF and PNG to ``figures/`` at the repository root."""
+    from pathlib import Path
+    folder = Path(folder) if folder else Path(__file__).resolve().parents[1] / "figures"
+    folder.mkdir(exist_ok=True)
+    for ext in ("pdf", "png"):
+        fig.savefig(folder / f"{name}.{ext}", dpi=200, bbox_inches="tight")
+
+
 def use_style() -> None:
     mpl.rcParams.update({
         "figure.facecolor": SURFACE, "axes.facecolor": SURFACE, "savefig.facecolor": SURFACE,

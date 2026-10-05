@@ -10,7 +10,7 @@ from .game import InteractionRecord, empty_record, play, update_memory
 from .popularity import POPULARITY
 from .rewiring import REWIRING
 from .state import build_city, make_streams
-from .ties import TIE_RULES, reinforce
+from .ties import TIE_RULES, drop_refused, reinforce
 
 
 @dataclass
@@ -99,6 +99,7 @@ class Simulation:
         removed = refilled = 0
         if st.t % cfg.rewiring.every == 0:
             removed, swapped = self.tie_rule.sever(st, cfg, rng)
+            removed += drop_refused(st, cfg)
             formed += swapped
             refilled = self.rewiring.refill(st, cfg, rng)
         self.popularity.update(st, record, cfg)

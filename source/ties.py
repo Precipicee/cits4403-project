@@ -51,6 +51,19 @@ def _remove(state, a, b):
     state.weights_changed()
 
 
+def drop_refused(state, cfg) -> int:
+    """End every tie between two agents who have walked away from each other. Only the
+    "experience" refusal ends a relationship; a tie to a low-rated partner under "reputation" is
+    left to fade with neglect like any other unused tie."""
+    if cfg.encounter.refusal != "experience":
+        return 0
+    from .encounter import refused
+    a, b = np.nonzero(np.triu(state.adjacency & refused(state, cfg), 1))
+    if len(a):
+        _remove(state, a, b)
+    return len(a)
+
+
 @TIE_RULES.register("none")
 class NoSeverance:
     def sever(self, state, cfg, rng=None) -> tuple[int, int]:

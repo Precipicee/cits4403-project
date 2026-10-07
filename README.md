@@ -51,8 +51,8 @@ is reproducible from its seed and configuration.
 8-worker pool: the model, what we expected, the sweep, the figures, an extended analysis and the
 conclusions. Figures used elsewhere are also written to `figures/`.
 
-- **Prosperity:** more givers make a city richer, and without refusal the gain accelerates once
-  givers pass about 30% of the population.
+- **Prosperity:** more givers make a city richer, and without refusal the gain is faster once givers
+  are common. Where the gain speeds up depends on the settings.
 - **Inequality without refusal is positional:** a city where everyone plays Tit-for-Tat, so that
   nobody is ever exploited, is nearly as unequal as a mixed one (Gini 0.21 against 0.23). The
   inequality comes from who gets met, and the rank order of who gets met is largely settled
@@ -65,6 +65,9 @@ conclusions. Figures used elsewhere are also written to `figures/`.
   starts losing wealth once a refusal lasts longer than about a year.
 - **A subtle cheat escapes:** Joss, which cooperates nine games in ten, keeps about nine tenths of
   its wealth under refusal, while AllD and Random lose about three quarters of theirs.
+- **Sensitivity:** with each of ten settings lowered and raised in turn, refusal always cuts takers
+  off and a city where nobody cheats always stays unequal. The faster gain in prosperity (H1) passes
+  its test in 15 of the 20 changed settings, and the equal poverty trap (H4) in 11.
 
 ## Setup
 
@@ -92,6 +95,19 @@ jupyter lab notebooks/Project.ipynb
 
 Run the cells top to bottom. Every result is generated on the spot; nothing is read from a saved
 results file.
+
+### Explore one city
+
+The notebook's *Explore One City* section has controls for the scenario, the share of givers, how
+long a refusal lasts, whether Joss is among the takers, and the seed. It runs one city of 60
+citizens over 300 weeks and steps through it week by week. The controls need a running Jupyter
+kernel; the same controls can be opened in any notebook:
+
+```python
+from utilities.explorer import explore
+
+explore({"S5 full city": ("M4", {}), "S6 refusal": ("M5", {})})
+```
 
 ### Drive the model yourself
 
@@ -127,7 +143,7 @@ tables = run(exp, workers=8)
 ```
 cits4403-project/
 |-- source/            model code: game, strategies, encounter, ties, popularity, rewiring, metrics
-|-- utilities/         plotting, statistics, checks, small sweeps
+|-- utilities/         plotting, statistics, checks, small sweeps, the interactive explorer
 |-- notebooks/         Project.ipynb: the analysis, start to finish
 |-- figures/           figures and the network animation written by the notebook
 |-- project_spec.md    project specification

@@ -27,6 +27,9 @@ THIN = 5            # rounds between points in timeseries_mean.csv
 
 @dataclass
 class Experiment:
+    """A grid of cities: every combination of the values in ``axes`` (with ``fixed`` overrides on
+    top of the ``base`` preset), each run for ``n_seeds`` seeds."""
+
     name: str
     base: str
     root_seed: int
@@ -37,10 +40,12 @@ class Experiment:
     write_raw: bool = True
 
     def cells(self) -> list[dict]:
+        """Every combination of axis values, as one override dictionary per cell."""
         keys = list(self.axes)
         return [dict(zip(keys, values)) for values in itertools.product(*self.axes.values())]
 
     def config(self, cell: dict):
+        """Validated configuration for one cell."""
         from .presets import preset
         return preset(self.base, **{**self.fixed, **cell})
 
@@ -112,6 +117,8 @@ def _run_task(task):
 
 
 def run(exp: Experiment, workers: int | None = None, progress: bool = True) -> dict[str, pd.DataFrame]:
+    """Run every cell and seed in parallel, aggregate, and save the tables under
+    ``data/results/<name>/``. Returns the tables by name (``runs``, ``cells``, ``timeseries_mean``)."""
     for var in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
         os.environ[var] = "1"
     tasks = [(exp, c, cell, r) for c, cell in enumerate(exp.cells()) for r in range(exp.n_seeds)]
@@ -130,6 +137,8 @@ def run(exp: Experiment, workers: int | None = None, progress: bool = True) -> d
 
 
 def aggregate(exp: Experiment, runs: pd.DataFrame, thins=None, n_boot: int = 2000) -> dict[str, pd.DataFrame]:
+    """Per-cell summaries of every metric over seeds (mean, median, standard deviation and a
+    percentile bootstrap interval), plus mean time series with intervals when ``thins`` is given."""
     from .metrics import bootstrap_ci
     axes = list(exp.axes)
     runs = runs.sort_values(["cell", "repeat"]).reset_index(drop=True)

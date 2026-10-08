@@ -26,6 +26,8 @@ def _cooperation_share(state, record):
 
 @POPULARITY.register("none")
 class NoPopularity:
+    """Every rating fixed at 1, so popularity has no effect on partner choice (stages S1 to S3)."""
+
     def initialise(self, state, cfg):
         state.rating[:] = 1.0
 
@@ -34,6 +36,10 @@ class NoPopularity:
 
 
 class _Rated:
+    """Shared machinery for ratings of the form ``R_min + (R_max - R_min) * combine(kappa, s)``,
+    where ``kappa`` is a smoothed cooperation signal and ``s`` is total tie strength relative
+    to the largest in the city. ``kappa`` only updates for agents who played that round."""
+
     def combine(self, kappa, share, cfg):
         raise NotImplementedError
 
@@ -45,10 +51,14 @@ class _Rated:
         state.rating[:] = p.r_min + (p.r_max - p.r_min) * self.combine(state.coop_ema, _strength_share(state, cfg), cfg)
 
     def signal(self, state, record, cfg):
+        """Games played this round per agent, and the share of its moves that were cooperative."""
         moves, coop = _cooperation_share(state, record)
         return moves, np.divide(coop, moves, out=np.zeros(state.n), where=moves > 0)
 
     def update(self, state, record, cfg):
+        """After a round: move each agent's ``kappa`` a fraction ``eta`` of the way towards this
+        round's signal (``kappa <- (1 - eta) * kappa + eta * x``) for agents who played, then
+        recompute every rating."""
         moves, x = self.signal(state, record, cfg)
         eta = cfg.popularity.smoothing
         played = moves > 0
@@ -58,6 +68,8 @@ class _Rated:
 
 @POPULARITY.register("behaviour_x_strength")
 class BehaviourTimesStrength(_Rated):
+    """Default rating: ``kappa * s``, so an agent needs to be both cooperative and connected."""
+
     # A product: a taker's rating collapses however connected it is, while a connected
     # cooperator's rating compounds, which is the concentration mechanism behind H2.
     def combine(self, kappa, share, cfg):
@@ -66,6 +78,9 @@ class BehaviourTimesStrength(_Rated):
 
 @POPULARITY.register("weighted_sum")
 class WeightedSum(_Rated):
+    """Robustness alternative: ``mix * kappa + (1 - mix) * s``, so either quality can make up
+    for the other."""
+
     def combine(self, kappa, share, cfg):
         a = cfg.popularity.mix
         return a * kappa + (1 - a) * share
@@ -73,6 +88,9 @@ class WeightedSum(_Rated):
 
 @POPULARITY.register("payoff_delivered")
 class PayoffDelivered(_Rated):
+    """Robustness alternative: as the default, but ``kappa`` tracks the payoff an agent gives its
+    partners per game, as a share of ``T``, instead of its share of cooperative moves."""
+
     def combine(self, kappa, share, cfg):
         return kappa * share
 

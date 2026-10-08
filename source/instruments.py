@@ -37,6 +37,9 @@ def _class_mean(values, mask):
 
 @INSTRUMENTS.register("core")
 class Core:
+    """Every round: prosperity, inequality, cooperation, tie and component measures, listed in
+    ``CORE_METRICS``. Cheap enough to run on every city."""
+
     name = "core"
 
     def start(self, state, cfg, rng):
@@ -96,6 +99,10 @@ class Core:
 
 @INSTRUMENTS.register("structure")
 class Structure:
+    """At round 0, every ``structure_every`` rounds and at the end: assortativity, communities, degree and tie
+    strength by class, clustering and path length, listed in ``STRUCTURE_METRICS``. Slower than
+    ``Core``, so it is recorded less often."""
+
     name = "structure"
 
     def start(self, state, cfg, rng):
@@ -155,6 +162,8 @@ def _snapshot(st, cfg):
 
 @INSTRUMENTS.register("snapshot")
 class Snapshot:
+    """The whole city at the final round, for network drawings and per-strategy summaries."""
+
     name = "snapshot"
 
     def start(self, state, cfg, rng):
@@ -170,6 +179,9 @@ class Snapshot:
 
 @INSTRUMENTS.register("snapshots")
 class Snapshots:
+    """The whole city at round 0, every ``snapshot_every`` rounds and at the end, for drawings
+    and animations over time."""
+
     name = "snapshots"
 
     def start(self, state, cfg, rng):
@@ -184,6 +196,7 @@ class Snapshots:
 
 
 def make_instruments(names, cfg):
+    """A fresh instrument for each registered name, e.g. ``("core", "structure")``."""
     return [INSTRUMENTS.create(n) for n in names]
 
 

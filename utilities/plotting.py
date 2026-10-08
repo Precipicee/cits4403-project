@@ -34,6 +34,7 @@ def save(fig, name: str, folder=None) -> None:
 
 
 def use_style() -> None:
+    """Apply the shared matplotlib style used by every figure."""
     mpl.rcParams.update({
         "figure.facecolor": SURFACE, "axes.facecolor": SURFACE, "savefig.facecolor": SURFACE,
         "axes.edgecolor": AXIS, "axes.labelcolor": INK_2, "axes.titlecolor": INK,

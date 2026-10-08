@@ -21,6 +21,9 @@ def largest_remainder(total: int, weights: dict) -> dict:
 
 
 def strategy_counts(pop) -> tuple[dict, dict]:
+    """Number of agents of each strategy, as (givers, takers). The giver count is the giver
+    fraction times the population, rounded half up; each class is then split by its composition
+    weights with ``largest_remainder``."""
     n_givers = int(np.floor(pop.giver_fraction * pop.n_agents + 0.5))
     return (largest_remainder(n_givers, pop.giver_composition),
             largest_remainder(pop.n_agents - n_givers, pop.taker_composition))
@@ -32,6 +35,8 @@ def _ids(counts: dict) -> np.ndarray:
 
 
 def place(adjacency: np.ndarray, pop, rng) -> np.ndarray:
+    """Strategy id for every node. ``"random"`` placement shuffles strategies over the nodes;
+    ``"clustered"`` puts all givers in one breadth-first block grown from a random node."""
     giver_counts, taker_counts = strategy_counts(pop)
     givers, takers = _ids(giver_counts), _ids(taker_counts)
     n = pop.n_agents
@@ -57,6 +62,9 @@ def place(adjacency: np.ndarray, pop, rng) -> np.ndarray:
 
 
 def initial_wealth(pop, rng) -> np.ndarray:
+    """Starting wealth. ``"zero"`` (the default) gives every agent 0; otherwise a random half of
+    the agents start richer, so the starting Gini equals ``endowment_gini`` (exactly when the
+    number of agents is even)."""
     n = pop.n_agents
     if pop.initial_wealth == "zero":
         return np.zeros(n)

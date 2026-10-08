@@ -10,6 +10,7 @@ from .plotting import AXIS, CLASS_COLOURS, INK, STRATEGY_COLOURS, STRATEGY_LABEL
 
 
 def layout(adjacency: np.ndarray, seed: int = 0) -> dict:
+    """Spring-layout positions for each node, reproducible from ``seed``."""
     g = nx.from_numpy_array(adjacency.astype(int))
     return nx.spring_layout(g, seed=seed, k=1.2 / np.sqrt(len(adjacency)))
 
@@ -70,11 +71,13 @@ def draw_snapshot(ax, snap: dict, pos: dict, title: str = "", max_size: float = 
 
 
 def strategy_legend(ax, keys=STRATEGY_KEYS):
+    """Legend of strategy colours below ``ax``."""
     handles = [ax.scatter([], [], color=STRATEGY_COLOURS[k], s=30, label=STRATEGY_LABELS[k]) for k in keys]
     ax.legend(handles=handles, loc="lower center", ncol=4, bbox_to_anchor=(0.5, -0.12))
 
 
 def class_legend(ax):
+    """Legend of giver and taker colours below ``ax``."""
     handles = [ax.scatter([], [], color=CLASS_COLOURS[c], s=30, label=c) for c in ("giver", "taker")]
     ax.legend(handles=handles, loc="lower center", ncol=2, bbox_to_anchor=(0.5, -0.08))
 

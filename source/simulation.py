@@ -15,6 +15,8 @@ from .ties import TIE_RULES, drop_refused, reinforce
 
 @dataclass
 class RoundInfo:
+    """What happened in one round: the games played and the ties formed, removed and refilled."""
+
     record: InteractionRecord
     formed: int = 0
     removed: int = 0
@@ -23,6 +25,10 @@ class RoundInfo:
 
 @dataclass
 class RunResult:
+    """A finished run: its configuration and seed, each instrument's output by name, and the
+    final random-generator state for exact comparisons between runs. The final city state is
+    kept only when requested."""
+
     config: object
     root_seed: int
     repeat: int
@@ -42,6 +48,9 @@ def _concat(records: list[InteractionRecord]) -> InteractionRecord:
 
 
 class Simulation:
+    """One city run for ``cfg.run.n_rounds`` rounds. The same ``(cfg, root_seed, repeat)``
+    always gives the same run; ``instruments`` choose what is recorded, never what happens."""
+
     def __init__(self, cfg, root_seed: int = 0, repeat: int = 0, instruments=("core",)):
         from .instruments import make_instruments
         self.cfg = cfg
@@ -74,6 +83,9 @@ class Simulation:
         return reinforce(st, record, cfg)
 
     def run_round(self) -> RoundInfo:
+        """Advance one week: choose partners, play and pay, update memory and ties, sever weak
+        ties (and, under refusal, ties between pairs that have walked away), refill capacity,
+        update ratings, then let each instrument record the round."""
         st, cfg, rng = self.state, self.cfg, self.streams.dynamics
         st.t += 1
         st.received[:] = 0
@@ -109,6 +121,8 @@ class Simulation:
         return info
 
     def run(self, keep_state: bool = False) -> RunResult:
+        """Play every round and collect the instruments' outputs; ``keep_state`` keeps the final
+        city state in the result."""
         for _ in range(self.cfg.run.n_rounds):
             self.run_round()
         outputs = {inst.name: inst.result() for inst in self.instruments}

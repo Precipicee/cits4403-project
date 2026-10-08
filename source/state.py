@@ -16,6 +16,9 @@ NEVER = -(10**6)
 
 @dataclass
 class Streams:
+    """The four random generators of a run, one per purpose, so that drawing more numbers for
+    one purpose (such as measuring) never shifts the draws of another (such as the dynamics)."""
+
     topology: np.random.Generator
     population: np.random.Generator
     dynamics: np.random.Generator
@@ -31,6 +34,10 @@ def make_streams(root_seed: int, repeat: int) -> Streams:
 
 @dataclass
 class CityState:
+    """Everything that changes during a run, as numpy arrays indexed by agent (``n``) or by pair
+    (``n x n``): strategies and class, wealth and income, ties and their strengths, per-partner
+    move memory, cooperation averages and ratings. ``t`` is the current round."""
+
     n: int
     t: int
     strategy: np.ndarray
@@ -60,6 +67,7 @@ class CityState:
     _kernel_cache: tuple | None = None
 
     def weights_changed(self) -> None:
+        """Mark tie weights as changed, so the cached decayed weights are recomputed."""
         self.weights_version += 1
 
     def effective_weight(self, decay_rate: float) -> np.ndarray:
@@ -82,15 +90,20 @@ class CityState:
         return self._kernel_cache[2]
 
     def strength(self, decay_rate: float) -> np.ndarray:
+        """Each agent's total tie strength, decayed to the current round."""
         return self.effective_weight(decay_rate).sum(axis=1)
 
     def degree(self) -> np.ndarray:
+        """Number of ties each agent holds."""
         return self.adjacency.sum(axis=1)
 
     def free_capacity(self) -> np.ndarray:
+        """Number of further ties each agent may form before reaching its capacity."""
         return self.capacity - self.degree()
 
     def to_networkx(self, decay_rate: float) -> nx.Graph:
+        """The city as a networkx graph, with decayed tie strengths as edge weights and each
+        agent's strategy, class, wealth and rating as node attributes."""
         w = self.effective_weight(decay_rate)
         g = nx.Graph()
         for i in range(self.n):
@@ -148,6 +161,9 @@ def _trim_to_capacity(adjacency: np.ndarray, capacity: np.ndarray) -> tuple[np.n
 
 
 def build_city(cfg, streams: Streams) -> CityState:
+    """The city at round 0: a connected starting network, strategies placed on it, tie capacity
+    set (trimming any agent that starts over capacity), every tie at ``initial_weight``, empty
+    move memory, and initial ratings from the popularity rule."""
     from .encounter import distance_matrix
     from .popularity import POPULARITY
 

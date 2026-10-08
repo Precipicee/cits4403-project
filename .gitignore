@@ -20,3 +20,6 @@ ipython_config.py
 
 # Data
 data/raw/
+
+# Notebook output
+figures/

@@ -27,11 +27,15 @@ class LocalRefill:
         enc = cfg.encounter
         kernel = state.kernel(enc)
         status = state.rating ** enc.popularity_exponent
+        from .encounter import refused
+        closed = refused(state, cfg)
         created = 0
         for i in rng.permutation(agents):
             while free[i] > 0:
                 open_ = (free > 0) & ~state.adjacency[i]
                 open_[i] = False
+                if closed is not None:
+                    open_ &= ~closed[i]
                 row = kernel[i] * status * open_ * (state.distance[i] >= 2)
                 total = row.sum()
                 if total <= 0:

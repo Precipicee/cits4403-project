@@ -8,7 +8,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 GIVER_STRATEGIES = ("allc", "tft", "gtft", "tf2t", "grudger", "pavlov")
-TAKER_STRATEGIES = ("alld", "random")
+TAKER_STRATEGIES = ("alld", "random", "joss")
+# Joss is available to every city but not drawn by default: the default taker class is the two
+# unconditional defectors, and Joss is mixed in only where a scenario asks for it.
+DEFAULT_TAKERS = ("alld", "random")
 
 
 class ConfigError(ValueError):
@@ -20,7 +23,7 @@ class PopulationConfig:
     n_agents: int = 200
     giver_fraction: float = 0.5
     giver_composition: dict = field(default_factory=lambda: {k: 1.0 for k in GIVER_STRATEGIES})
-    taker_composition: dict = field(default_factory=lambda: {k: 1.0 for k in TAKER_STRATEGIES})
+    taker_composition: dict = field(default_factory=lambda: {k: 1.0 for k in DEFAULT_TAKERS})
     placement: str = "random"
     initial_wealth: str = "zero"
     endowment_mean: float = 10.0
@@ -51,6 +54,9 @@ class GameConfig:
 class StrategyParams:
     gtft_forgiveness: float = 0.1
     random_cooperation: float = 0.5
+    # Axelrod's Joss: Tit-for-Tat that slips in an unprovoked defection one game in ten, so it
+    # cooperates ~90% of the time and holds a rating close to a giver's while still exploiting.
+    joss_defection: float = 0.1
     classes: dict = field(default_factory=lambda: {**{k: "giver" for k in GIVER_STRATEGIES},
                                                    **{k: "taker" for k in TAKER_STRATEGIES}})
 
@@ -69,6 +75,13 @@ class EncounterConfig:
     weight_exponent: float = 1.0
     popularity_exponent: float = 1.0
     eps: float = 0.1
+    # Who an agent will not play. "experience": a pair stops meeting once either side has
+    # defected on the other at their last game (walking away instead of retaliating).
+    # "reputation": nobody plays a partner rated below refusal_threshold. "none": every
+    # meeting is accepted.
+    refusal: str = "none"
+    refusal_memory: int | None = None
+    refusal_threshold: float = 0.25
 
 
 @dataclass(frozen=True)
@@ -111,6 +124,7 @@ class UpdateConfig:
 class MetricsConfig:
     income_window: int = 25
     structure_every: int = 10
+    snapshot_every: int = 50
     community_method: str = "louvain"
     assortativity_attribute: str = "class"
     inequality: str = "gini"
@@ -206,6 +220,8 @@ class ModelConfig:
             e.append(f"unknown topology.name: {t.name}")
         if t.name in ("watts_strogatz", "barabasi_albert") and t.mean_degree % 2:
             e.append("topology.mean_degree must be even for watts_strogatz and barabasi_albert")
+        if not 0.0 <= s.joss_defection <= 1.0:
+            e.append("strategies.joss_defection must lie in [0, 1]")
         if g.rho <= 0 or not 0.0 <= g.noise <= 1.0 or g.subsistence_cost < 0:
             e.append("game.rho > 0, game.noise in [0, 1], game.subsistence_cost >= 0 required")
         if enc.rule not in ("sampled", "all_edges"):
@@ -218,6 +234,10 @@ class ModelConfig:
             e.append("encounter.on_saturated must be redraw or drop")
         if enc.kernel not in ("power", "rank"):
             e.append("encounter.kernel must be power or rank")
+        if enc.refusal not in ("none", "experience", "reputation"):
+            e.append("encounter.refusal must be none, experience or reputation")
+        if enc.refusal_memory is not None and enc.refusal_memory < 1:
+            e.append("encounter.refusal_memory must be None or at least 1")
         if enc.eps <= 0:
             e.append("encounter.eps must be positive")
         if ti.decay_rate < 0 or ti.severance_threshold < 0 or ti.initial_weight <= 0 or ti.reinforcement <= 0:
@@ -234,8 +254,9 @@ class ModelConfig:
             e.append("popularity: 0 < r_min <= r_max, 0 < smoothing <= 1, 0 <= mix <= 1 required")
         if self.update.order not in ("synchronous", "asynchronous"):
             e.append("update.order must be synchronous or asynchronous")
-        if self.run.n_rounds < 1 or self.metrics.income_window < 1 or self.metrics.structure_every < 1:
-            e.append("run.n_rounds, metrics.income_window and metrics.structure_every must be at least 1")
+        if self.run.n_rounds < 1 or self.metrics.income_window < 1 or self.metrics.structure_every < 1 \
+                or self.metrics.snapshot_every < 1:
+            e.append("run.n_rounds and the metrics.*_window/*_every settings must be at least 1")
         if e:
             raise ConfigError("; ".join(e))
         return self

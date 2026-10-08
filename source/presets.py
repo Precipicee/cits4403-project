@@ -1,4 +1,4 @@
-"""Stage presets M0 to M4. Each stage adds one mechanism to the one before it."""
+"""Stage presets M0 to M5. Each stage adds one mechanism to the one before it."""
 from __future__ import annotations
 
 from .config import ModelConfig
@@ -21,9 +21,10 @@ _M3 = {**_M2, "encounter.d_max": 3, "encounter.distance_exponent": 1.0, "encount
        "encounter.popularity_exponent": 1.0, "encounter.max_received": 4,
        "popularity.rule": "behaviour_x_strength"}
 _M4 = {**_M3, "rewiring.rule": "local_refill"}
+_M5 = {**_M4, "encounter.refusal": "experience"}
 
 STAGES = {"M0": _M0, "M1": _M1, "M1-edges": {**_M1, "encounter.rule": "all_edges"},
-          "M2": _M2, "M3": _M3, "M4": _M4}
+          "M2": _M2, "M3": _M3, "M4": _M4, "M5": _M5}
 
 
 def stage(name: str, **overrides) -> ModelConfig:

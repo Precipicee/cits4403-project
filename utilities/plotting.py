@@ -11,9 +11,10 @@ INK, INK_2, MUTED, GRID, AXIS = "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#c3
 # Colour follows the entity everywhere: one colour per class, strategy and topology.
 CLASS_COLOURS = {"giver": "#2a78d6", "taker": "#eb6834"}
 STRATEGY_COLOURS = {"allc": "#2a78d6", "alld": "#eb6834", "tft": "#1baf7a", "gtft": "#eda100",
-                    "tf2t": "#e87ba4", "grudger": "#008300", "pavlov": "#4a3aa7", "random": "#e34948"}
+                    "tf2t": "#e87ba4", "grudger": "#008300", "pavlov": "#4a3aa7", "random": "#e34948",
+                    "joss": "#8a4b1c"}
 STRATEGY_LABELS = {"allc": "AllC", "alld": "AllD", "tft": "TFT", "gtft": "GTFT", "tf2t": "TF2T",
-                   "grudger": "Grudger", "pavlov": "Pavlov", "random": "Random"}
+                   "grudger": "Grudger", "pavlov": "Pavlov", "random": "Random", "joss": "Joss"}
 TOPOLOGY_COLOURS = {"erdos_renyi": "#4a3aa7", "watts_strogatz": "#008300", "barabasi_albert": "#e34948"}
 TOPOLOGY_STYLES = {"erdos_renyi": "-", "watts_strogatz": "--", "barabasi_albert": ":"}
 TOPOLOGY_MARKERS = {"erdos_renyi": "o", "watts_strogatz": "s", "barabasi_albert": "^"}
@@ -21,6 +22,15 @@ TOPOLOGY_LABELS = {"erdos_renyi": "Erdős–Rényi", "watts_strogatz": "Watts–
 STAGE_COLOURS = {"M0": MUTED, "M1": "#4a3aa7", "M1-edges": "#1baf7a"}
 STAGE_STYLES = {"M0": "--", "M1": "-", "M1-edges": ":"}
 SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
+
+
+def save(fig, name: str, folder=None) -> None:
+    """Write ``fig`` as PDF and PNG to ``figures/`` at the repository root."""
+    from pathlib import Path
+    folder = Path(folder) if folder else Path(__file__).resolve().parents[1] / "figures"
+    folder.mkdir(exist_ok=True)
+    for ext in ("pdf", "png"):
+        fig.savefig(folder / f"{name}.{ext}", dpi=200, bbox_inches="tight")
 
 
 def use_style() -> None:

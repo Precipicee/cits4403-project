@@ -4,6 +4,7 @@ from __future__ import annotations
 import numpy as np
 
 from . import metrics as M
+from .encounter import refused
 from .registry import Registry
 from .strategies import STRATEGY_KEYS
 
@@ -15,6 +16,7 @@ CORE_METRICS = (
     "coop_rate", "coop_rate_giver", "coop_rate_taker", "cc_share", "cd_share", "dd_share",
     "payoff_gap", "repeat_share", "stranger_share", "n_ties", "mean_weight", "turnover",
     "largest_component", "isolated", "idle", "dropped", "max_received", "mean_rating",
+    "games_giver", "games_taker", "wealth_giver", "wealth_taker", "gini_games", "gini_surplus", "closed_pairs",
 )
 STRUCTURE_METRICS = (
     "assortativity_class", "assortativity_strategy", "modularity", "purity", "n_communities",
@@ -74,6 +76,19 @@ class Core:
         d["idle"][t], d["dropped"][t] = r.idle, r.dropped
         d["max_received"][t] = st.received.max()
         d["mean_rating"][t] = st.rating.mean()
+        # Games played is attention received and given; with every payoff positive, wealth is
+        # close to a multiple of it, so its Gini is the positional part of wealth inequality.
+        d["games_giver"][t] = _class_mean(st.games_played, st.giver)
+        d["games_taker"][t] = _class_mean(st.games_played, ~st.giver)
+        d["wealth_giver"][t] = _class_mean(w, st.giver)
+        d["wealth_taker"][t] = _class_mean(w, ~st.giver)
+        d["gini_games"][t] = M.gini(st.games_played)
+        # Surplus over mutual defection: each game's payoff less P, so the payoffs become
+        # (T-P, R-P, 0, S-P) and being exploited costs wealth. Nothing in the model reads wealth,
+        # so this re-measures the same runs rather than changing them.
+        d["gini_surplus"][t] = M.gini(w - cfg.game.rho * cfg.game.payoff[2] * st.games_played)
+        closed = refused(st, cfg)
+        d["closed_pairs"][t] = 0 if closed is None else np.triu(closed, 1).sum()
 
     def result(self):
         return self.data
@@ -156,13 +171,12 @@ class Snapshot:
 @INSTRUMENTS.register("snapshots")
 class Snapshots:
     name = "snapshots"
-    every = 50
 
     def start(self, state, cfg, rng):
         self.cfg, self.data = cfg, [_snapshot(state, cfg)]
 
     def update(self, st, info, rng):
-        if st.t % self.every == 0 or st.t == self.cfg.run.n_rounds:
+        if st.t % self.cfg.metrics.snapshot_every == 0 or st.t == self.cfg.run.n_rounds:
             self.data.append(_snapshot(st, self.cfg))
 
     def result(self):

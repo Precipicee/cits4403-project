@@ -19,8 +19,9 @@ The project asks how the mix of givers and takers shapes a city's **prosperity**
   agent-based model is for.
 - **What we vary:** the share of givers, from 0 to 1; the starting network (random, small-world,
   scale-free); and how fast relationships decay.
-- **How we build it:** five steps, each adding one mechanism to the last, from a well-mixed
-  crowd to the full city. Each step reproduces the previous one exactly, with the same seed,
+- **How we build it:** six steps, each adding one mechanism to the last, from a well-mixed
+  crowd to the full city, and finally to a city whose citizens walk away from anyone who cheats
+  them. Each step reproduces the previous one exactly, with the same seed,
   when its new mechanism is switched off.
 
 ## Model Description
@@ -34,6 +35,9 @@ Each round is one week. For every round:
 5. agents with spare capacity form new relationships, usually with friends of friends;
 6. popularity ratings update from how cooperative and well-connected each agent has been.
 
+In the last step (S6), a pair stops meeting once either side has defected on the other, and the
+tie between them ends. The rule never mentions class or strategy.
+
 Partner choice uses the attractiveness score `s_ij = (w_ij + eps)^beta * R_j^gamma * d_ij^-lambda`,
 where `w` is relationship strength, `R` is the partner's popularity rating and `d` is path length
 through the network. Meetings received are capped, because attention is finite.
@@ -43,21 +47,27 @@ is reproducible from its seed and configuration.
 
 ## Results
 
-`notebooks/Project.ipynb` runs the whole argument end to end in about ten minutes: the model,
-what we expected, the sweep, the figures, an extended analysis and the conclusions. In short: more
-givers make a city richer, and the gain accelerates once givers pass about 30% of the population,
-but the richest cities are not the most equal. Inequality peaks in mixed cities, and a city where
-nobody is ever exploited is no more equal than a mixed one, because the inequality is positional.
+`notebooks/Project.ipynb` runs the whole argument end to end in about fifteen minutes on an
+8-worker pool: the model, what we expected, the sweep, the figures, an extended analysis and the
+conclusions. Every figure is also written to `figures/` as PDF and PNG.
 
-The extended analysis takes that last point further. Holding everyone on Tit-for-Tat, so that no
-game can ever be exploited, total wealth is fixed by the rules and only its distribution varies:
-the Gini moves from 0.05 under uniform partner choice to 0.21 under the full rule, and the rank
-order of who gets met is settled within the first 25 of 500 weeks. It also decomposes the model
-ladder step by step and tracks clustering and connectivity over time. Rewiring a city from a
-lattice to a random graph, which collapses clustering elevenfold while holding the population and
-the mean degree fixed, moves the cooperation rate by -0.0055 (se 0.0025): real, but some twenty
-times less than partner choice moves it in a single step. Within this model, how ties are
-arranged is a rounding error next to who gets chosen.
+- **Prosperity:** more givers make a city richer, and without refusal the gain is faster once givers
+  are common. Where the gain speeds up depends on the settings.
+- **Inequality without refusal is positional:** a city where everyone plays Tit-for-Tat, so that
+  nobody is ever exploited, is nearly as unequal as a mixed one (Gini 0.21 against 0.23). The
+  inequality comes from who gets met, and the rank order of who gets met is largely settled
+  within the first 25 of 500 weeks.
+- **Refusal changes whose inequality it is:** when citizens walk away from a defector for even
+  one week, the Gini barely moves, but the share of inequality lying between givers and takers
+  rises from about a fifth to more than four fifths.
+- **Refusal that never forgives becomes exclusion:** almost every taker ends with no ties, givers
+  keep about 3,000 each at every mix, and taker-dominated cities become poor and unequal. The city
+  starts losing wealth once a refusal lasts longer than about a year.
+- **A subtle cheat escapes:** Joss, which cooperates nine games in ten, keeps about nine tenths of
+  its wealth under refusal, while AllD and Random lose about three quarters of theirs.
+- **Sensitivity:** with each of ten settings lowered and raised in turn, refusal always cuts takers
+  off and a city where nobody cheats always stays unequal. The faster gain in prosperity (H1) passes
+  its test in 15 of the 20 changed settings, and the equal poverty trap (H4) in 11.
 
 ## Setup
 
@@ -86,6 +96,19 @@ jupyter lab notebooks/Project.ipynb
 Run the cells top to bottom. Every result is generated on the spot; nothing is read from a saved
 results file.
 
+### Explore one city
+
+The notebook's *Explore One City* section has controls for the scenario, the share of givers, how
+long a refusal lasts, whether Joss is among the takers, and the seed. It runs one city of 60
+citizens over 300 weeks and steps through it week by week. The controls need a running Jupyter
+kernel; the same controls can be opened in any notebook:
+
+```python
+from utilities.explorer import explore
+
+explore({"S5 full city": ("M4", {}), "S6 refusal": ("M5", {})})
+```
+
 ### Drive the model yourself
 
 ```python
@@ -97,7 +120,7 @@ sim = Simulation(cfg, root_seed=20260918, repeat=0, instruments=("core", "struct
 result = sim.run()
 ```
 
-`stage` takes `"M0"` to `"M4"`, the five build steps, and any configuration key as a keyword
+`stage` takes `"M0"` to `"M5"`, the six build steps, and any configuration key as a keyword
 override, so any modelling choice can be changed from a single call. `utilities.runs.sweep`
 runs a grid of cities in parallel and returns one row per run.
 
@@ -120,8 +143,9 @@ tables = run(exp, workers=8)
 ```
 cits4403-project/
 |-- source/            model code: game, strategies, encounter, ties, popularity, rewiring, metrics
-|-- utilities/         plotting, statistics, checks, small sweeps
+|-- utilities/         plotting, statistics, checks, small sweeps, the interactive explorer
 |-- notebooks/         Project.ipynb: the analysis, start to finish
+|-- figures/           figures and the network animation written by the notebook
 |-- project_spec.md    project specification
 |-- requirements.txt   dependencies
 `-- README.md

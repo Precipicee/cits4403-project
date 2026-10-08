@@ -1,4 +1,4 @@
-"""The eight Iterated Prisoner's Dilemma strategies, vectorised over interaction sides.
+"""The Iterated Prisoner's Dilemma strategies, vectorised over interaction sides.
 
 Moves are integers: 0 = cooperate (C), 1 = defect (D). For an actor i facing partner j,
 the partner's previous move is ``last_move[j, i]`` and the one before it ``prev_move[j, i]``.
@@ -82,6 +82,21 @@ class RandomStrategy(Strategy):
 
     def moves(self, state, actors, partners, params, rng):
         return (rng.random(len(actors)) >= params.random_cooperation).astype(np.int8)
+
+
+@STRATEGIES.register("joss")
+class Joss(Strategy):
+    # Tit-for-Tat with an occasional unprovoked defection: it never forgives, and it sometimes
+    # cheats a partner who has only ever cooperated. A taker that is hard to spot by its record.
+    stochastic = True
+
+    def moves(self, state, actors, partners, params, rng):
+        m = TitForTat.moves(self, state, actors, partners, params, rng)
+        cooperating = np.flatnonzero(m == C)
+        if len(cooperating):
+            cheat = rng.random(len(cooperating)) < params.joss_defection
+            m[cooperating[cheat]] = D
+        return m
 
 
 STRATEGY_KEYS = tuple(STRATEGIES.names())

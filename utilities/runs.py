@@ -16,9 +16,12 @@ from typing import NamedTuple
 
 import pandas as pd
 
+import numpy as np
+
 from source.experiment import summarise
 from source.presets import stage
 from source.simulation import Simulation
+from source.strategies import STRATEGY_KEYS
 
 DEFAULT_SEED = 20260918
 
@@ -46,12 +49,29 @@ def run_one(scenario: str, base: str, overrides: dict, root_seed: int, repeat: i
     label = {"scenario": scenario, "repeat": repeat,
              "giver_fraction": cfg.population.giver_fraction, "topology": cfg.topology.name}
     row = {**label, **metrics}
+    if result.outputs.get("snapshot") is not None:
+        row.update(by_strategy(result.outputs["snapshot"]))
     if not timeseries:
         return row
     history = {"core": {**label, **thin}}
     if result.outputs.get("structure") is not None:
         history["structure"] = {**label, **result.outputs["structure"]}
     return row, history
+
+
+def by_strategy(snap: dict) -> dict:
+    """Final wealth, games played, rating and the share left with no ties, per strategy present,
+    as columns such as ``wealth_alld``."""
+    out = {}
+    isolated = snap["adjacency"].sum(axis=1) == 0
+    for s_id, key in enumerate(STRATEGY_KEYS):
+        mask = snap["strategy"] == s_id
+        if mask.any():
+            out[f"wealth_{key}"] = float(snap["wealth"][mask].mean())
+            out[f"games_{key}"] = float(snap["games_played"][mask].mean())
+            out[f"rating_{key}"] = float(snap["rating"][mask].mean())
+            out[f"isolated_{key}"] = float(isolated[mask].mean())
+    return out
 
 
 def _task(args):
@@ -90,16 +110,20 @@ def sweep(scenarios: dict[str, tuple[str, dict]], fractions, n_seeds: int = 5,
 
 
 def _map(tasks, workers: int | None) -> list[dict]:
-    """Run the tasks in parallel where the platform allows it, otherwise one at a time.
+    return parallel_map(_task, tasks, workers)
+
+
+def parallel_map(func, tasks, workers: int | None = None) -> list:
+    """``[func(t) for t in tasks]``, in parallel where the platform allows it.
 
     ``fork`` keeps this usable from a notebook, where a spawned worker cannot re-import the
-    interactive session.
+    interactive session; a function defined in a notebook cell can be passed directly.
     """
     if "fork" not in mp.get_all_start_methods():
-        return [_task(t) for t in tasks]
+        return [func(t) for t in tasks]
     with ProcessPoolExecutor(max_workers=workers or os.cpu_count(),
                              mp_context=mp.get_context("fork")) as pool:
-        return list(pool.map(_task, tasks, chunksize=1))
+        return list(pool.map(func, tasks, chunksize=1))
 
 
 def cell_means(runs: pd.DataFrame, metrics, by=("scenario", "giver_fraction")) -> pd.DataFrame:

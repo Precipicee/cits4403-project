@@ -17,12 +17,15 @@ The project asks how the mix of givers and takers shapes a city's **prosperity**
 - **Why agent-based?** Prosperity, inequality and segregation are outcomes no citizen chooses.
   They emerge from many local interactions that are each simple to state, which is what an
   agent-based model is for.
-- **What we vary:** the share of givers, from 0 to 1; the starting network (random, small-world,
-  scale-free); and how fast relationships decay.
+- **What we vary:** the share of givers, from 0 to 1 in steps of 0.2, on a random and a
+  scale-free starting network. Separate experiments vary clustering (small-world networks), how
+  long a refusal lasts, and ten other settings one at a time, including how fast relationships
+  decay.
 - **How we build it:** six steps, each adding one mechanism to the last, from a well-mixed
   crowd to the full city, and finally to a city whose citizens walk away from anyone who cheats
-  them. Each step reproduces the previous one exactly, with the same seed,
-  when its new mechanism is switched off.
+  them. Each step is built to reproduce the previous one exactly, with the same seed, when its
+  new mechanism is switched off; the notebook checks this for S3 against S2, S5 against S4 and
+  S6 against S5.
 
 ## Model Description
 
@@ -73,7 +76,7 @@ conclusions. Every figure is also written to `figures/` as PDF and PNG.
 
 ### Prerequisites
 
-- Python >= 3.10
+- Python >= 3.10 (tested on 3.10 and 3.12)
 - pip
 
 ### Installation
@@ -84,6 +87,8 @@ cd cits4403-project
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 ```
+
+On systems where `python` points to Python 2 or is missing, use `python3` in the third line.
 
 ## Usage
 
@@ -145,8 +150,8 @@ cits4403-project/
 |-- source/            model code: game, strategies, encounter, ties, popularity, rewiring, metrics
 |-- utilities/         plotting, statistics, checks, small sweeps, the interactive explorer
 |-- notebooks/         Project.ipynb: the analysis, start to finish
-|-- figures/           figures and the network animation written by the notebook
-|-- project_spec.md    project specification
+|-- figures/           figures and the network animation, created when the notebook runs
+|-- project_spec.md    the original project proposal; the notebook describes the final design
 |-- requirements.txt   dependencies
 `-- README.md
 ```

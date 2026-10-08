@@ -47,9 +47,9 @@ is reproducible from its seed and configuration.
 
 ## Results
 
-`notebooks/Project.ipynb` runs the whole argument end to end in about twelve minutes on an
+`notebooks/Project.ipynb` runs the whole argument end to end in about fifteen minutes on an
 8-worker pool: the model, what we expected, the sweep, the figures, an extended analysis and the
-conclusions. Figures used elsewhere are also written to `figures/`.
+conclusions. Every figure is also written to `figures/` as PDF and PNG.
 
 - **Prosperity:** more givers make a city richer, and without refusal the gain is faster once givers
   are common. Where the gain speeds up depends on the settings.

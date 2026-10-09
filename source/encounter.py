@@ -61,6 +61,8 @@ def refused(state, cfg) -> np.ndarray | None:
     Under "experience" a pair is closed once either side defected on the other at their last
     game: the victim walks away, and the defector cannot get back in. Nothing here looks at
     class or strategy, so any exclusion of takers comes from what they did, partner by partner.
+    Under "reputation" every pair involving an agent whose ``reputation_measure`` is below
+    ``refusal_threshold`` is closed.
     """
     enc = cfg.encounter
     if enc.refusal == "none":
@@ -70,7 +72,8 @@ def refused(state, cfg) -> np.ndarray | None:
         if enc.refusal_memory is not None:
             closed &= (state.t - state.last_game) <= enc.refusal_memory
         return closed
-    low = state.rating < enc.refusal_threshold
+    judged = state.coop_ema if enc.reputation_measure == "cooperation" else state.rating
+    low = judged < enc.refusal_threshold
     return low[:, None] | low[None, :]
 
 

@@ -87,11 +87,17 @@ class EncounterConfig:
     eps: float = 0.1
     # Who an agent will not play. "experience": a pair stops meeting once either side has
     # defected on the other at their last game (walking away instead of retaliating).
-    # "reputation": nobody plays a partner rated below refusal_threshold. "none": every
-    # meeting is accepted.
+    # "reputation": nobody plays a partner whose reputation_measure is below refusal_threshold.
+    # "none": every meeting is accepted.
     refusal: str = "none"
     refusal_memory: int | None = None
     refusal_threshold: float = 0.25
+    # What "reputation" refusal judges. "cooperation": the smoothed share of cooperative moves,
+    # which every agent starts at popularity.initial_cooperation, so nobody is refused before
+    # they have played. "rating": the full popularity rating, which also scales with tie
+    # strength, so an agent starting with under about a third of the top agent's strength is
+    # refused from round 0 and, never playing, can never raise it.
+    reputation_measure: str = "cooperation"
 
 
 @dataclass(frozen=True)
@@ -272,6 +278,8 @@ class ModelConfig:
             e.append("encounter.refusal must be none, experience or reputation")
         if enc.refusal_memory is not None and enc.refusal_memory < 1:
             e.append("encounter.refusal_memory must be None or at least 1")
+        if enc.reputation_measure not in ("cooperation", "rating"):
+            e.append("encounter.reputation_measure must be cooperation or rating")
         if enc.eps <= 0:
             e.append("encounter.eps must be positive")
         if ti.decay_rate < 0 or ti.severance_threshold < 0 or ti.initial_weight <= 0 or ti.reinforcement <= 0:

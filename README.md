@@ -38,15 +38,16 @@ Each round is one week. For every round:
 5. agents with spare capacity form new relationships, usually with friends of friends;
 6. popularity ratings update from how cooperative and well-connected each agent has been.
 
-In the last step (S6), a pair stops meeting once either side has defected on the other, and the
-tie between them ends. The rule never mentions class or strategy.
+In the sixth build step (S6), a pair stops meeting once either side has defected on the other,
+and the tie between them ends. The rule never mentions class or strategy.
 
 Partner choice uses the attractiveness score `s_ij = (w_ij + eps)^beta * R_j^gamma * d_ij^-lambda`,
 where `w` is relationship strength, `R` is the partner's popularity rating and `d` is path length
 through the network. Meetings received are capped, because attention is finite.
 
-Every stochastic step draws from one seeded `numpy` generator passed through the model, so a run
-is reproducible from its seed and configuration.
+Every stochastic step draws from seeded `numpy` generators, one each for the starting network, the
+population, the dynamics and measurement, all derived from the run's seed. A run is therefore
+reproducible from its seed and configuration, and measuring a city never changes what happens in it.
 
 ## Results
 
@@ -58,14 +59,14 @@ conclusions. Every figure is also written to `figures/` as PDF and PNG.
   are common. Where the gain speeds up depends on the settings.
 - **Inequality without refusal is positional:** a city where everyone plays Tit-for-Tat, so that
   nobody is ever exploited, is nearly as unequal as a mixed one (Gini 0.21 against 0.23). The
-  inequality comes from who gets met, and the rank order of who gets met is largely settled
-  within the first 25 of 500 weeks.
+  inequality comes from who gets met, and that is decided early: the ranking of citizens by games
+  played at week 25 already matches the ranking at week 500 with a correlation of 0.80.
 - **Refusal changes whose inequality it is:** when citizens walk away from a defector for even
   one week, the Gini barely moves, but the share of inequality lying between givers and takers
   rises from about a fifth to more than four fifths.
 - **Refusal that never forgives becomes exclusion:** almost every taker ends with no ties, givers
   keep about 3,000 each at every mix, and taker-dominated cities become poor and unequal. The city
-  starts losing wealth once a refusal lasts longer than about a year.
+  starts losing wealth once a refusal lasts longer than 52 weeks.
 - **A subtle cheat escapes:** Joss, which cooperates nine games in ten, keeps about nine tenths of
   its wealth under refusal, while AllD and Random lose about three quarters of theirs.
 - **Sensitivity:** with each of ten settings lowered and raised in turn, refusal always cuts takers
@@ -137,18 +138,28 @@ results, and run in parallel. Aggregated tables are written to `data/results/`:
 ```python
 from source.experiment import Experiment, run
 
-exp = Experiment(name="cities", base="M4", root_seed=20260917, n_seeds=25,
-                 axes={"population.giver_fraction": [0.0, 0.25, 0.5, 0.75, 1.0],
-                       "topology.name": ["erdos_renyi", "barabasi_albert"]})
-tables = run(exp, workers=8)
+if __name__ == "__main__":
+    exp = Experiment(name="cities", base="M4", root_seed=20260917, n_seeds=25,
+                     axes={"population.giver_fraction": [0.0, 0.25, 0.5, 0.75, 1.0],
+                           "topology.name": ["erdos_renyi", "barabasi_albert"]})
+    tables = run(exp, workers=8)
 ```
+
+`run` starts each worker as a fresh Python process, so a script needs the
+`if __name__ == "__main__":` line; without it the script stops with a `RuntimeError`. In a
+notebook the line makes no difference.
 
 ## Project Structure
 
 ```
 cits4403-project/
-|-- source/            model code: game, strategies, encounter, ties, popularity, rewiring, metrics
-|-- utilities/         plotting, statistics, checks, small sweeps, the interactive explorer
+|-- source/            model code: settings and build steps (config, presets), the city and its
+|                      start (state, topology, population), the weekly loop (simulation), one
+|                      module per rule (game, strategies, encounter, ties, popularity, rewiring),
+|                      measures (metrics, instruments), experiment runs (experiment, io) and the
+|                      registry of rule names (registry)
+|-- utilities/         plotting, network drawings and the animation, statistics, checks, small
+|                      sweeps, the explorer and the model diagram
 |-- notebooks/         Project.ipynb: the analysis, start to finish
 |-- figures/           figures and the network animation, created when the notebook runs
 |-- project_spec.md    the original project proposal; the notebook describes the final design

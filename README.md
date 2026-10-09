@@ -153,8 +153,13 @@ notebook the line makes no difference.
 
 ```
 cits4403-project/
-|-- source/            model code: game, strategies, encounter, ties, popularity, rewiring, metrics
-|-- utilities/         plotting, statistics, checks, small sweeps, the explorer, the model diagram
+|-- source/            model code: settings and build steps (config, presets), the city and its
+|                      start (state, topology, population), the weekly loop (simulation), one
+|                      module per rule (game, strategies, encounter, ties, popularity, rewiring),
+|                      measures (metrics, instruments), experiment runs (experiment, io) and the
+|                      registry of rule names (registry)
+|-- utilities/         plotting, network drawings and the animation, statistics, checks, small
+|                      sweeps, the explorer and the model diagram
 |-- notebooks/         Project.ipynb: the analysis, start to finish
 |-- figures/           figures and the network animation, created when the notebook runs
 |-- project_spec.md    the original project proposal; the notebook describes the final design

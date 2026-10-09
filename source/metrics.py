@@ -6,6 +6,9 @@ import numpy as np
 
 
 def gini(x) -> float:
+    """Gini coefficient of ``x``: 0 when every value is equal, approaching 1 when one value holds
+    everything. Uses the sorted-rank form ``2 * sum(i * x_i) / (n * sum(x)) - (n + 1) / n`` with
+    ``x`` ascending and ``i`` from 1. NaN when ``x`` is empty or sums to zero or less."""
     x = np.sort(np.asarray(x, dtype=float))
     n, total = len(x), x.sum()
     if n == 0 or total <= 0:
@@ -14,6 +17,8 @@ def gini(x) -> float:
 
 
 def lorenz(x) -> tuple[np.ndarray, np.ndarray]:
+    """Lorenz curve of ``x``: the share of agents, poorest first, and the share of the total they
+    hold, both starting at 0. A curve on the diagonal is perfect equality."""
     x = np.sort(np.asarray(x, dtype=float))
     p = np.arange(len(x) + 1) / len(x)
     cum = np.concatenate([[0.0], np.cumsum(x)])
@@ -21,18 +26,24 @@ def lorenz(x) -> tuple[np.ndarray, np.ndarray]:
 
 
 def top_share(x, q: float = 0.1) -> float:
+    """Share of the total held by the richest ``q`` of agents (at least one agent)."""
     x = np.sort(np.asarray(x, dtype=float))[::-1]
     k = max(1, int(round(q * len(x))))
     return float(x[:k].sum() / x.sum()) if x.sum() > 0 else float("nan")
 
 
 def bottom_share(x, q: float = 0.5) -> float:
+    """Share of the total held by the poorest ``q`` of agents (at least one agent)."""
     x = np.sort(np.asarray(x, dtype=float))
     k = max(1, int(round(q * len(x))))
     return float(x[:k].sum() / x.sum()) if x.sum() > 0 else float("nan")
 
 
 def theil(x) -> float:
+    """Theil T index, ``mean((x / mu) * ln(x / mu))``, with zero values contributing 0. Like the
+    Gini it is 0 under perfect equality, but unlike the Gini it splits exactly into within-group
+    and between-group parts (see ``theil_decomposition``). NaN for a non-positive mean or any
+    negative value."""
     x = np.asarray(x, dtype=float)
     mu = x.mean() if len(x) else 0.0
     if mu <= 0 or (x < 0).any():
@@ -60,6 +71,8 @@ def theil_decomposition(x, groups) -> tuple[float, float, float]:
 
 
 def rankdata(a) -> np.ndarray:
+    """Ranks from 1, with tied values given the mean of the ranks they span (as in
+    ``scipy.stats.rankdata``), so the model does not need scipy."""
     a = np.asarray(a, dtype=float)
     order = np.argsort(a, kind="mergesort")
     ranks = np.empty(len(a))
@@ -71,6 +84,8 @@ def rankdata(a) -> np.ndarray:
 
 
 def spearman(a, b) -> float:
+    """Spearman rank correlation: the Pearson correlation of the ranks. NaN when either input is
+    constant."""
     ra, rb = rankdata(a), rankdata(b)
     if ra.std() == 0 or rb.std() == 0:
         return float("nan")
@@ -91,10 +106,12 @@ def components(adjacency: np.ndarray) -> np.ndarray:
 
 
 def largest_component_share(adjacency: np.ndarray) -> float:
+    """Share of agents in the largest connected component."""
     return float(np.bincount(components(adjacency)).max() / len(adjacency))
 
 
 def n_components(adjacency: np.ndarray) -> int:
+    """Number of connected components, counting each agent with no ties as its own component."""
     return int(len(np.unique(components(adjacency))))
 
 
@@ -133,6 +150,7 @@ def local_clustering(adjacency: np.ndarray) -> np.ndarray:
 
 
 def average_clustering(adjacency: np.ndarray) -> float:
+    """Mean of the per-node clustering coefficients: the typical citizen's neighbourhood."""
     return float(local_clustering(adjacency).mean())
 
 
@@ -181,6 +199,9 @@ def bootstrap_ci(values, n_boot: int = 2000, level: float = 0.95, rng=None, axis
 
 
 def assortativity(graph: nx.Graph, attribute: str) -> float:
+    """Attribute assortativity of ``graph`` on a node attribute, such as ``"giver"``: positive
+    when ties join agents with the same value, negative when they join different values. NaN
+    when there are no ties, only one value is present, or networkx cannot compute it."""
     try:
         values = set(nx.get_node_attributes(graph, attribute).values())
         if graph.number_of_edges() == 0 or len(values) < 2:
@@ -191,6 +212,8 @@ def assortativity(graph: nx.Graph, attribute: str) -> float:
 
 
 def communities(graph: nx.Graph, method: str, seed: int):
+    """Partition of the nodes into communities on tie strength: Louvain when ``method`` is
+    ``"louvain"``, greedy modularity otherwise. With no ties, every node is its own community."""
     if graph.number_of_edges() == 0:
         return [{v} for v in graph.nodes]
     if method == "louvain":
@@ -199,6 +222,12 @@ def communities(graph: nx.Graph, method: str, seed: int):
 
 
 def modularity_and_purity(graph: nx.Graph, groups: np.ndarray, method: str, seed: int):
+    """Modularity of the detected communities, their class purity and how many there are.
+
+    Purity is the share of agents who belong to the majority class of their own community, so 1
+    means every community is all givers or all takers. ``groups`` is a boolean array (True for a
+    giver). Modularity and purity are NaN when there are no ties.
+    """
     parts = communities(graph, method, seed)
     if graph.number_of_edges() == 0:
         return float("nan"), float("nan"), len(parts)

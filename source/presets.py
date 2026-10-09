@@ -33,8 +33,10 @@ def stage(name: str, **overrides) -> ModelConfig:
 
 
 def calibrated(**overrides) -> ModelConfig:
+    """The full city (M4) with the calibrated values of ``eps``, decay, threshold and cap."""
     return stage("M4", **{**CALIBRATED, **overrides})
 
 
 def preset(name: str, **overrides) -> ModelConfig:
+    """``calibrated`` when ``name`` is ``"calibrated"``, otherwise the stage of that name."""
     return calibrated(**overrides) if name == "calibrated" else stage(name, **overrides)

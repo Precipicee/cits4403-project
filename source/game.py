@@ -10,6 +10,11 @@ from .strategies import STRATEGY_OBJECTS
 
 @dataclass(frozen=True)
 class InteractionRecord:
+    """Every game played in one round, one entry per game in parallel arrays: who initiated and
+    who was chosen, both moves (0 cooperate, 1 defect), both payoffs, and whether the pair had
+    played before or held a tie. ``idle`` and ``dropped`` count agents who found no partner and
+    requests refused by the cap."""
+
     initiator: np.ndarray
     partner: np.ndarray
     move_i: np.ndarray        # realised moves after noise
@@ -23,6 +28,7 @@ class InteractionRecord:
 
     @property
     def n_games(self) -> int:
+        """Number of games in the round."""
         return len(self.initiator)
 
 

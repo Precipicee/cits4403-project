@@ -66,13 +66,21 @@ def drop_refused(state, cfg) -> int:
 
 @TIE_RULES.register("none")
 class NoSeverance:
+    """Ties never break (stages S1 and S2)."""
+
     def sever(self, state, cfg, rng=None) -> tuple[int, int]:
+        """Remove nothing. Returns ``(removed, formed)``, here ``(0, 0)``."""
         return 0, 0
 
 
 @TIE_RULES.register("absolute")
 class AbsoluteSeverance:
+    """A tie breaks when its decayed strength falls below ``severance_threshold``, judged on its
+    own strength rather than against alternatives."""
+
     def sever(self, state, cfg, rng=None):
+        """Remove every tie below the threshold. Returns ``(removed, formed)``, with ``formed``
+        always 0; freed capacity is refilled separately by the rewiring rule."""
         weak = np.triu(state.adjacency & (state.effective_weight(cfg.ties.decay_rate) < cfg.ties.severance_threshold), 1)
         a, b = np.nonzero(weak)
         if len(a):

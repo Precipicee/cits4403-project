@@ -10,6 +10,8 @@ N_BOOT = 2000
 
 
 def mean_ci(values, level=0.95, rng=None):
+    """Mean of ``values`` (ignoring NaN) with its percentile bootstrap interval, as
+    ``(mean, low, high)``."""
     values = np.asarray(values, dtype=float)
     lo, hi = bootstrap_ci(values, N_BOOT, level, rng)
     return float(np.nanmean(values)), float(lo), float(hi)
@@ -21,6 +23,7 @@ def paired_difference(a, b, level=0.95, rng=None):
 
 
 def linear_rss(x, y):
+    """Residual sum of squares of a straight-line fit of ``y`` on ``x``, and its coefficients."""
     coef = np.polyfit(x, y, 1)
     return float(np.sum((y - np.polyval(coef, x)) ** 2)), coef
 
@@ -39,10 +42,21 @@ def segmented_fit(x, y, grid=np.arange(0.05, 0.9501, 0.01)):
 
 
 def bic(rss, n, p):
+    """Bayesian information criterion of a least-squares fit with ``p`` parameters on ``n``
+    points: ``n * ln(rss / n) + p * ln(n)``. Lower is better; extra parameters must earn their
+    keep."""
     return n * np.log(rss / n) + p * np.log(n)
 
 
 def h1_threshold(runs: pd.DataFrame, metric="mean_wealth", rng=None):
+    """H1, prosperity threshold: does wealth bend upwards as the giver fraction rises?
+
+    Fits a straight line (2 parameters) and a continuous two-segment line (4 parameters, the
+    bend found by grid search) to every run's ``metric`` against the giver fraction. Supported
+    when the bent line wins by more than 10 in BIC and a bootstrap over seeds (300 resamples)
+    puts the slope increase at the bend above zero; refuted when the BIC difference is 2 or
+    less; otherwise inconclusive. Also returns the bend and its bootstrap interval.
+    """
     rng = rng if rng is not None else np.random.default_rng(1)
     x = runs["population.giver_fraction"].to_numpy(float)
     y = runs[metric].to_numpy(float)
@@ -73,6 +87,14 @@ def _paired(runs, f_a, f_b, metric):
 
 
 def h2_decoupling(runs: pd.DataFrame, rng=None):
+    """H2, prosperity and equality decouple: does inequality stop falling in rich cities?
+
+    For each step between adjacent giver fractions, takes the change in Gini and in mean wealth
+    paired by seed, with bootstrap intervals. Supported when, at some step starting at
+    ``f >= 0.5``, both rise clearly (99% intervals above zero). Refuted when the Gini never rises
+    clearly at any step (99.5% intervals) and the upper end of the bootstrap interval of the
+    Spearman correlation between giver fraction and Gini is below zero. Otherwise inconclusive.
+    """
     fractions = np.round(np.sort(runs["population.giver_fraction"].unique()), 2)
     pairs = []
     for fa, fb in zip(fractions[:-1], fractions[1:]):
@@ -101,6 +123,14 @@ def h2_decoupling(runs: pd.DataFrame, rng=None):
 
 
 def h3_segregation(runs: pd.DataFrame, fractions=(0.3, 0.4, 0.5, 0.6, 0.7), rng=None):
+    """H3, emergent segregation: do givers sort together while takers lose ties?
+
+    In mixed cities (``fractions``), uses each run's late trend in class assortativity, and the
+    taker-minus-giver gaps in realised partners and mean tie strength, each with a 95%
+    bootstrap interval. Supported when assortativity clearly rises and both gaps are clearly
+    negative; refuted when assortativity does not clearly rise and neither gap differs from
+    zero; otherwise inconclusive.
+    """
     sub = runs[np.isclose(runs["population.giver_fraction"].to_numpy()[:, None], fractions).any(axis=1)]
     slope = mean_ci(sub["assortativity_slope"], rng=rng)
     degree = mean_ci(sub["realised_degree_taker"] - sub["realised_degree_giver"], rng=rng)
@@ -112,6 +142,8 @@ def h3_segregation(runs: pd.DataFrame, fractions=(0.3, 0.4, 0.5, 0.6, 0.7), rng=
 
 
 def eta_squared(values, groups) -> float:
+    """Share of the variance in ``values`` explained by ``groups``: between-group sum of squares
+    over the total. NaN when ``values`` are constant."""
     values, groups = np.asarray(values, float), np.asarray(groups)
     grand = values.mean()
     between = sum(len(values[groups == g]) * (values[groups == g].mean() - grand) ** 2 for g in np.unique(groups))
@@ -120,6 +152,14 @@ def eta_squared(values, groups) -> float:
 
 
 def h4_equal_poverty(runs: pd.DataFrame, rng=None):
+    """H4, the poverty trap is equal: are taker-dominated cities poor but not unequal?
+
+    Compares taker-dominated (``f <= 0.3``) with giver-dominated (``f >= 0.7``) cities, paired by
+    seed. Supported when median wealth is clearly lower, the Gini is no higher (mean gap at most
+    0 and interval below 0.05), and the giver fraction explains clearly more of the variance in
+    median wealth than in the Gini (difference in eta squared, bootstrapped over seeds).
+    Refuted when median wealth is not clearly lower or the Gini is clearly higher.
+    """
     rng = rng if rng is not None else np.random.default_rng(3)
     f = runs["population.giver_fraction"].to_numpy(float)
     taker, giver = runs[f <= 0.3 + 1e-9], runs[f >= 0.7 - 1e-9]

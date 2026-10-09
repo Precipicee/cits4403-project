@@ -10,7 +10,10 @@ REWIRING = Registry("rewiring rule")
 
 @REWIRING.register("none")
 class NoRewiring:
+    """Freed tie capacity stays empty (stages S1 to S4)."""
+
     def refill(self, state, cfg, rng) -> int:
+        """Form no ties. Returns the number formed, here 0."""
         return 0
 
 

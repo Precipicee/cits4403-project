@@ -20,6 +20,8 @@ class ConfigError(ValueError):
 
 @dataclass(frozen=True)
 class PopulationConfig:
+    """How many agents there are, the share and mix of givers and takers, where strategies are
+    placed on the network, and how wealth starts. Connection-style settings are optional."""
     n_agents: int = 200
     giver_fraction: float = 0.5
     giver_composition: dict = field(default_factory=lambda: {k: 1.0 for k in GIVER_STRATEGIES})
@@ -35,6 +37,8 @@ class PopulationConfig:
 
 @dataclass(frozen=True)
 class TopologyConfig:
+    """The starting network: its generator and mean degree, and the Watts-Strogatz rewiring
+    probability when that generator is used."""
     name: str = "erdos_renyi"
     mean_degree: int = 6
     ws_rewire_prob: float = 0.1
@@ -42,6 +46,8 @@ class TopologyConfig:
 
 @dataclass(frozen=True)
 class GameConfig:
+    """The Prisoner's Dilemma payoffs ``(T, R, P, S)``, the resource density ``rho`` that scales
+    them, a per-round subsistence cost, and the chance that a move is flipped by noise."""
     # Axelrod's tournament payoffs (T, R, P, S): 2R > T + S makes mutual cooperation the
     # wealth-maximising pairing, so city wealth is a readout of how agents treat each other.
     payoff: tuple = (5.0, 3.0, 1.0, 0.0)
@@ -52,6 +58,8 @@ class GameConfig:
 
 @dataclass(frozen=True)
 class StrategyParams:
+    """Parameters of the stochastic strategies, and which class (giver or taker) each strategy
+    belongs to."""
     gtft_forgiveness: float = 0.1
     random_cooperation: float = 0.5
     # Axelrod's Joss: Tit-for-Tat that slips in an unprovoked defection one game in ten, so it
@@ -63,6 +71,8 @@ class StrategyParams:
 
 @dataclass(frozen=True)
 class EncounterConfig:
+    """Partner choice: meetings started and received per round, the reach ``d_max``, the
+    exponents on distance, tie strength and popularity, the offset ``eps``, and who refuses whom."""
     rule: str = "sampled"
     initiated: int = 1
     max_received: int | None = 4
@@ -86,6 +96,8 @@ class EncounterConfig:
 
 @dataclass(frozen=True)
 class TieConfig:
+    """Ties: starting strength, reinforcement per meeting, decay rate, the severance threshold and
+    rule, and how each agent's tie capacity is set."""
     initial_weight: float = 1.0
     reinforcement: float = 1.0
     # Neglect, not punishment: an untouched tie of weight 1 falls below theta = 0.1
@@ -100,6 +112,8 @@ class TieConfig:
 
 @dataclass(frozen=True)
 class RewiringConfig:
+    """How freed tie capacity is refilled, the fallback when no local candidate exists, and how
+    often severance and refilling run."""
     rule: str = "local_refill"
     fallback: str = "global"
     every: int = 1
@@ -107,6 +121,8 @@ class RewiringConfig:
 
 @dataclass(frozen=True)
 class PopularityConfig:
+    """The popularity rating: which rule combines behaviour and tie strength, its bounds, the
+    smoothing of the cooperation average and that average's starting value."""
     rule: str = "behaviour_x_strength"
     r_min: float = 0.1
     r_max: float = 1.0
@@ -117,11 +133,15 @@ class PopularityConfig:
 
 @dataclass(frozen=True)
 class UpdateConfig:
+    """Whether agents act together on the state at the start of a round (synchronous) or one at a
+    time in random order (asynchronous)."""
     order: str = "synchronous"
 
 
 @dataclass(frozen=True)
 class MetricsConfig:
+    """Measurement settings, which never change the dynamics: the income window, how often
+    structure and snapshots are recorded, and the community and assortativity choices."""
     income_window: int = 25
     structure_every: int = 10
     snapshot_every: int = 50
@@ -132,11 +152,14 @@ class MetricsConfig:
 
 @dataclass(frozen=True)
 class RunConfig:
+    """Length of a run, in rounds (weeks)."""
     n_rounds: int = 500
 
 
 @dataclass(frozen=True)
 class ModelConfig:
+    """Every setting of one city, grouped by component. Frozen, so a configuration cannot change
+    during a run; use ``override`` to derive a validated copy with different values."""
     population: PopulationConfig = field(default_factory=PopulationConfig)
     topology: TopologyConfig = field(default_factory=TopologyConfig)
     game: GameConfig = field(default_factory=GameConfig)
@@ -151,13 +174,17 @@ class ModelConfig:
 
     # ---- serialisation -------------------------------------------------------------
     def to_dict(self) -> dict:
+        """Nested dictionary of every setting."""
         return dataclasses.asdict(self)
 
     def to_json(self) -> str:
+        """JSON of every setting with sorted keys, so equal configurations give equal text."""
         return json.dumps(self.to_dict(), sort_keys=True)
 
     @classmethod
     def from_dict(cls, d: dict) -> "ModelConfig":
+        """Rebuild and validate a configuration from ``to_dict`` output; missing sections take
+        their defaults."""
         parts = {}
         for f in dataclasses.fields(cls):
             sub_cls = f.default_factory().__class__
@@ -169,9 +196,12 @@ class ModelConfig:
 
     @classmethod
     def from_json(cls, text: str) -> "ModelConfig":
+        """Rebuild and validate a configuration from ``to_json`` output."""
         return cls.from_dict(json.loads(text))
 
     def config_hash(self) -> str:
+        """Short, stable identifier of the configuration (12 hex characters of a SHA-256 hash),
+        used to name saved run folders."""
         return hashlib.sha256(self.to_json().encode()).hexdigest()[:12]
 
     # ---- overrides -----------------------------------------------------------------
@@ -189,11 +219,15 @@ class ModelConfig:
         return dataclasses.replace(self, **replaced).validate()
 
     def get(self, key: str) -> Any:
+        """Value of a dotted key, e.g. ``"encounter.d_max"``."""
         section, _, name = key.partition(".")
         return getattr(getattr(self, section), name)
 
     # ---- validation ----------------------------------------------------------------
     def validate(self) -> "ModelConfig":
+        """Return ``self`` if every setting is valid; otherwise raise ``ConfigError`` listing
+        every violation at once, including the payoff ordering ``T > R > P > S`` and
+        ``2R > T + S``."""
         e = []
         p, t, g, s = self.population, self.topology, self.game, self.strategies
         enc, ti, rw, po = self.encounter, self.ties, self.rewiring, self.popularity

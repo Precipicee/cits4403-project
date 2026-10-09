@@ -27,7 +27,11 @@ def distance_matrix(adjacency: np.ndarray, d_max: int) -> np.ndarray:
 
 @KERNELS.register("power")
 class PowerKernel:
+    """Distance term ``d ** -lambda`` for candidates 1 to ``d_max`` hops away, 0 for everyone
+    else. Neighbours (``d = 1``) score 1 whatever ``lambda`` is."""
+
     def weights(self, dist, cfg):
+        """Kernel weight for every pair, from the path-length matrix ``dist``."""
         k = np.zeros(dist.shape)
         cand = (dist >= 1) & (dist <= cfg.d_max)
         k[cand] = 1.0 if cfg.distance_exponent == 0 else dist[cand].astype(float) ** -cfg.distance_exponent
@@ -36,8 +40,12 @@ class PowerKernel:
 
 @KERNELS.register("rank")
 class RankKernel:
-    # Liben-Nowell et al.: befriending probability falls with the number of people closer.
+    """Rank-based distance term (Liben-Nowell et al.): a candidate at distance ``d`` scores
+    ``r ** -lambda``, where ``r`` is the number of agents closer than ``d`` to the chooser,
+    the chooser included. A robustness alternative to ``PowerKernel``."""
+
     def weights(self, dist, cfg):
+        """Kernel weight for every pair, from the path-length matrix ``dist``."""
         k = np.zeros(dist.shape)
         for d in range(1, cfg.d_max + 1):
             closer = (dist < d).sum(axis=1, keepdims=True).astype(float)
@@ -91,6 +99,10 @@ def _choose(row_cumsum: np.ndarray, u: np.ndarray) -> np.ndarray:
 
 @ENCOUNTERS.register("sampled")
 class SampledEncounter:
+    """The default encounter rule: each agent draws ``initiated`` partners with probability
+    proportional to its scores, then requests to agents already at the ``max_received`` cap are
+    redrawn or dropped."""
+
     def pairs(self, state, cfg, rng, agents=None):
         """Requests from ``agents`` (all agents by default), capped by ``max_received``.
         Returns (pairs, idle, dropped)."""

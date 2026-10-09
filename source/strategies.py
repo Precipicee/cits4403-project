@@ -14,6 +14,9 @@ C, D, NONE = 0, 1, -1
 
 
 class Strategy:
+    """Base class. ``moves`` returns one move per actor against the matching partner, reading
+    per-partner memory from ``state``; ``stochastic`` marks strategies that draw from ``rng``."""
+
     key: str = ""
     stochastic: bool = False
 
@@ -23,18 +26,24 @@ class Strategy:
 
 @STRATEGIES.register("allc")
 class AlwaysCooperate(Strategy):
+    """AllC: always cooperates. Giver."""
+
     def moves(self, state, actors, partners, params, rng):
         return np.zeros(len(actors), dtype=np.int8)
 
 
 @STRATEGIES.register("alld")
 class AlwaysDefect(Strategy):
+    """AllD: always defects. Taker."""
+
     def moves(self, state, actors, partners, params, rng):
         return np.ones(len(actors), dtype=np.int8)
 
 
 @STRATEGIES.register("tft")
 class TitForTat(Strategy):
+    """TFT: cooperates with a new partner, then copies that partner's last move. Giver."""
+
     def moves(self, state, actors, partners, params, rng):
         last = state.last_move[partners, actors]
         return np.where(last == NONE, C, last).astype(np.int8)
@@ -42,6 +51,9 @@ class TitForTat(Strategy):
 
 @STRATEGIES.register("gtft")
 class GenerousTitForTat(Strategy):
+    """GTFT: as TFT, but forgives a defection (cooperates instead) with probability
+    ``gtft_forgiveness``. Giver."""
+
     stochastic = True
 
     def moves(self, state, actors, partners, params, rng):
@@ -55,6 +67,8 @@ class GenerousTitForTat(Strategy):
 
 @STRATEGIES.register("tf2t")
 class TitForTwoTats(Strategy):
+    """TF2T: defects only after the partner's last two moves were both defections. Giver."""
+
     def moves(self, state, actors, partners, params, rng):
         two = (state.last_move[partners, actors] == D) & (state.prev_move[partners, actors] == D)
         return two.astype(np.int8)
@@ -62,12 +76,18 @@ class TitForTwoTats(Strategy):
 
 @STRATEGIES.register("grudger")
 class Grudger(Strategy):
+    """Grudger (grim trigger): cooperates until a partner first defects on it, then always
+    defects against that partner. Giver."""
+
     def moves(self, state, actors, partners, params, rng):
         return state.grudge[actors, partners].astype(np.int8)
 
 
 @STRATEGIES.register("pavlov")
 class Pavlov(Strategy):
+    """Pavlov (win-stay, lose-shift): cooperates first, then repeats its own last move if the
+    partner cooperated and switches if the partner defected. Giver."""
+
     # Win-stay, lose-shift: a C from the partner (payoff R or T) is a win.
     def moves(self, state, actors, partners, params, rng):
         own = state.last_move[actors, partners]
@@ -78,6 +98,9 @@ class Pavlov(Strategy):
 
 @STRATEGIES.register("random")
 class RandomStrategy(Strategy):
+    """Random: cooperates with probability ``random_cooperation``, whatever the partner did.
+    Taker."""
+
     stochastic = True
 
     def moves(self, state, actors, partners, params, rng):
@@ -86,6 +109,9 @@ class RandomStrategy(Strategy):
 
 @STRATEGIES.register("joss")
 class Joss(Strategy):
+    """Joss: as TFT, but replaces a cooperation with an unprovoked defection with probability
+    ``joss_defection``. Taker; not in the default taker mix."""
+
     # Tit-for-Tat with an occasional unprovoked defection: it never forgives, and it sometimes
     # cheats a partner who has only ever cooperated. A taker that is hard to spot by its record.
     stochastic = True

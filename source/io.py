@@ -13,6 +13,8 @@ RESULTS, RAW = DATA / "results", DATA / "raw"
 
 
 def write_run(path: Path, result, versions: dict) -> None:
+    """Save one run to ``path``: its configuration, seed and library versions as JSON, its
+    histories as compressed CSV, and any snapshots as compressed numpy archives."""
     path.mkdir(parents=True, exist_ok=True)
     meta = {"config": result.config.to_dict(), "root_seed": result.root_seed,
             "repeat": result.repeat, "versions": versions}
@@ -33,17 +35,20 @@ def write_run(path: Path, result, versions: dict) -> None:
 
 
 def read_snapshots(path: Path) -> list[dict]:
+    """Snapshots saved by ``write_run``, as one dictionary per recorded round."""
     with np.load(path) as z:
         stacked = {k: z[k] for k in z.files}
     return [{k: v[i] for k, v in stacked.items()} for i in range(len(stacked["round"]))]
 
 
 def results(name: str) -> dict[str, pd.DataFrame]:
+    """Saved result tables of the experiment ``name``, keyed by file name."""
     folder = RESULTS / name
     return {p.stem: pd.read_csv(p) for p in sorted(folder.glob("*.csv"))}
 
 
 def save_results(name: str, tables: dict[str, pd.DataFrame]) -> Path:
+    """Write each table to ``data/results/<name>/<table>.csv`` and return the folder."""
     folder = RESULTS / name
     folder.mkdir(parents=True, exist_ok=True)
     for stem, df in tables.items():

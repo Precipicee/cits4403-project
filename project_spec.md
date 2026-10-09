@@ -1,5 +1,10 @@
 # Project Specification: Cooperation, Prosperity and Inequality in Simulated Cities
 
+> **Status:** this is the original project proposal, written before the model was built. The
+> final design differs in places (for example, 100 citizens rather than 200, 5 seeds per setting
+> rather than 25, and a sixth step that adds refusal). `notebooks/Project.ipynb` describes the
+> model and experiments as they were actually run.
+
 ## 1. The Phenomenon We Are Modelling
 
 Communities of comparable size end up in strikingly different places. Some generate a lot of
